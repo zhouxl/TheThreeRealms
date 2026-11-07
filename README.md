@@ -42,6 +42,10 @@ src/
   game/
     World.tsx             # 程序化 3D 场景、第三人称镜头与关节式仪式占位动画
     incenseMotion.ts      # 行礼/插香纯函数时间线、姿态和释放节点
+    assets.ts             # GLB URL、契约与剪辑映射规则
+    GLBTraveler.tsx       # 正式旅人模型可选加载、动画剪辑与持香节点
+    GLBDeity.tsx          # 静态文昌帝君 GLB 渲染
+    AssetBoundary.tsx     # 加载或验证失败时回退灰盒
     rules.ts             # 世界比例、碰撞与交互规则（纯函数）
     fortuneData.ts       # 32 支原创签文
     db.ts                # IndexedDB 记录
@@ -60,6 +64,26 @@ src/
 运行 `npm run dev`，到前庭香炉旁：取香 → 点香 → 静心 → 点击「行礼」观察旅人弯腰再起身 → 点击「插香 · 完成」观察手与香向炉口移动；香在释放节点从手中消失并出现在炉中。按钮播放期间禁用，取消不会写入新记录，插香完成后才保存。可在「纪念」查看数量并刷新验证。
 
 这一阶段只有**程序化网格的可见动作**，没有真实 GLB 骨骼资产。正式资产的方向、骨骼挂点与动画事件见 `docs/ASSET_CONTRACT.md`。需要在桌面浏览器与手机实际检查穿模、镜头位置和动作节奏。
+
+## V1.3：导入自己的 GLB 模型（本分支）
+
+本次新增**可选的** GLB 渲染器和骨骼动画适配器，仓库目前**没有正式 GLB 文件**，因此默认展示原来的程序化小旅人和文昌帝君；这不是已经完成的美术资产替换。
+
+要试用自制模型：
+
+1. 用 Blender 等 DCC 软件导出 `traveler.glb`，大小约 1.55m，角色向本地 -Z 方向，根节点在脚底，GLB 中必须有 `IncenseGrip` 节点及 `Idle`、`Walk`、`Bow`、`PlaceIncense` 动画剪辑。具体制作合同见 `docs/ASSET_CONTRACT.md`。
+2. 导出文昌帝君静态模型 `wenchang.glb`，含底座高度约 2.85m，面向前庭 +Z。
+3. 放到 `public/models/traveler.glb` 和 `public/models/wenchang.glb`。
+4. 复制 `.env.example` 到 `.env.local`，设置：
+
+   ```dotenv
+   VITE_TRAVELER_GLB_URL=/models/traveler.glb
+   VITE_DEITY_GLB_URL=/models/wenchang.glb
+   ```
+
+5. 重启 `npm run dev`（Vite 的环境变量在启动时读取），到香炉边检查待机、行走、行礼、插香以及烟雾是否跟随手持香。动画剪辑的**实际时长**会按统一游戏时间线采样，在插香释放点保持记录提交规则。
+
+模型下载失败、缺少强制骨骼锚点或关键动画时会在开发者 Console 记录异常，并自动显示程序化回退角色。禁用 GLB 只需清空环境变量并重启开发服务器。外部模型的版权、许可和纹理应由资产提供方核实。
 
 ## 下一阶段：替换成正式 GLB 美术
 

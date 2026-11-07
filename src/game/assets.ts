@@ -1,0 +1,61 @@
+/** Standalone, testable contract for author-supplied glTF/GLB models. */
+export const TRAVELER_REQUIRED_CLIPS = ['Idle', 'Walk', 'Bow', 'PlaceIncense'] as const;
+export const TRAVELER_REQUIRED_NODES = ['IncenseGrip'] as const;
+export const TRAVELER_OPTIONAL_CLIPS = ['HoldIncense', 'TakeIncense', 'LightIncense'] as const;
+export const TRAVELER_EXPECTED_HEIGHT = 1.55;
+export const DEITY_EXPECTED_HEIGHT = 2.85;
+
+/**
+ * Restrict asset URLs to the app's public/ directory.
+ * An empty environment value means "keep the procedural fallback".
+ * No remote URL or traversal path should be silently fetched.
+ */
+export function normalizePublicGlbPath(value: string | undefined | null): string | null {
+  if (!value) return null;
+  const path = value.trim();
+  if (!path || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return null;
+  const [pathname, query] = path.split('?');
+  if (!pathname || path.split('?').length > 2 || !pathname.toLowerCase().endsWith('.glb')) return null;
+  if (pathname.split('/').some(segment => segment === '..' || segment === '.')) return null;
+  if (!/^\/[\w./-]+$/u.test(pathname)) return null;
+  if (query && !/^[\w=&.-]+$/u.test(query)) return null;
+  return path;
+}
+
+export type AssetValidation = Readonly<{
+  valid: boolean;
+  missingClips: readonly string[];
+  missingNodes: readonly string[];
+}>;
+
+/** Explicitly named transforms keep authoring deterministic across DCC packages. */
+export function validateTravelerContract(nodeNames: readonly string[], clipNames: readonly string[]): AssetValidation {
+  const nodes = new Set(nodeNames);
+  const clips = new Set(clipNames);
+  const missingClips = TRAVELER_REQUIRED_CLIPS.filter(name => !clips.has(name));
+  const missingNodes = TRAVELER_REQUIRED_NODES.filter(name => !nodes.has(name));
+  return {valid: missingClips.length === 0 && missingNodes.length === 0, missingClips, missingNodes};
+}
+
+/** GLB preflight: informative warning rather than changing user-authored mesh scale. */
+export function evaluateModelHeight(actual: number, expected: number, tolerance = 0.15): boolean {
+  return Number.isFinite(actual) && Number.isFinite(expected)
+    && expected > 0 && tolerance >= 0
+    && Math.abs(actual - expected) <= expected * tolerance;
+}
+
+/** Use a single timeline across procedural and GLB animation implementations. */
+export function selectTravelerClip(
+  ritualKind: 'explore' | 'incense' | 'fortune' | 'blessing',
+  incenseStep: string | null,
+  walking: boolean,
+): string {
+  if (ritualKind === 'incense') {
+    if (incenseStep === 'bowing') return 'Bow';
+    if (incenseStep === 'placing') return 'PlaceIncense';
+    // Resting states must not repeatedly loop one-shot Take/Light animations.
+    if (incenseStep === 'light' || incenseStep === 'hold'
+      || incenseStep === 'bow' || incenseStep === 'place') return 'HoldIncense';
+  }
+  return walking && ritualKind === 'explore' ? 'Walk' : 'Idle';
+}
