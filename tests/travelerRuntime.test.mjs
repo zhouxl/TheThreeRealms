@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
+import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion,getSafeHandReleaseTarget} from '../src/game/incenseTransforms.ts';
 import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
 import {INCENSE_RELEASE_PROGRESS,getIncenseReachWeight,sampleIncenseClipProgress} from '../src/game/incenseMotion.ts';
 import {armCenserClearance,getArmSkeletonPoints,liftElbowClearOfCenser} from '../src/game/incenseCollision.ts';
@@ -85,6 +85,7 @@ for(const count of [0,1,2,3,4,5]){
     const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
     mixer.clipAction(clip).play();
     const slot=getIncenseInsertionTarget(count);
+    const handSlot=getSafeHandReleaseTarget(slot);
     mixer.setTime(clip.duration*0.05);
     player.updateMatrixWorld(true);
     const start=grip.getWorldPosition(new THREE.Vector3());
@@ -103,8 +104,8 @@ for(const count of [0,1,2,3,4,5]){
       shoulder.position.y=0.21+0.34*weight;
       elbow.position.copy(elbowRest);
       hand.position.copy(handRest);
-      const desired=sampleOverhandInsertion(start,slot,progress);
-      positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
+      const desired=sampleOverhandInsertion(start,handSlot,progress);
+      positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,handSlot);
       const gripBefore=grip.getWorldPosition(new THREE.Vector3()).clone();
       liftElbowClearOfCenser(shoulder,elbow,hand,wrist);
       player.updateMatrixWorld(true);

@@ -7,7 +7,7 @@ import {
   TRAVELER_EXPECTED_HEIGHT, evaluateModelHeight, selectTravelerClip, validateTravelerContract,
 } from './assets.ts';
 import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
-import {aimWristUpright,positionIncenseHand} from './incenseTransforms.ts';
+import {aimWristUpright,positionIncenseHand,getSafeHandReleaseTarget} from './incenseTransforms.ts';
 import {liftElbowClearOfCenser} from './incenseCollision.ts';
 import {getIncenseInsertionTarget} from './incensePlacement.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
@@ -47,6 +47,7 @@ export default function GLBTraveler({
   const shoulder=useMemo(()=>model.getObjectByName('Shoulder_R'),[model]);
   const shoulderRestY=useMemo(()=>shoulder?.position.y??0,[shoulder]);
   const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
+  const handTarget=useMemo(()=>getSafeHandReleaseTarget(incenseTarget),[incenseTarget]);
   const mixer=useMemo(()=>new THREE.AnimationMixer(model),[model]);
   const actions=useMemo(()=>{
     const result=new Map<string,THREE.AnimationAction>();
@@ -136,7 +137,7 @@ export default function GLBTraveler({
       if(placing && shoulder && elbow && insertionStart.current){
         positionIncenseHand(
           shoulder,elbow,wrist,grip,'placing',actionProgress.current,
-          insertionStart.current,incenseTarget,
+          insertionStart.current,handTarget,
         );
         if(hand)liftElbowClearOfCenser(shoulder,elbow,hand,wrist);
       }else{

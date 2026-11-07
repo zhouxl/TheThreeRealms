@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  aimWristUpright,sampleOverhandInsertion,
+  aimWristUpright,sampleOverhandInsertion,getSafeHandReleaseTarget,HAND_RELEASE_CLEARANCE,
 } from '../src/game/incenseTransforms.ts';
 import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
 
@@ -37,4 +37,17 @@ test('the wrist, not the stick, corrects grip orientation in world space',()=>{
   assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-7);
   assert.ok(wrist.quaternion.angleTo(new THREE.Quaternion())>0.2);
   assert.ok(incense.quaternion.equals(new THREE.Quaternion()));
+});
+
+test('hand releases the incense ABOVE the ash; only the stick settles down',()=>{
+  const ash={x:0,y:1,z:3.5};
+  const handTarget=getSafeHandReleaseTarget(ash);
+  assert.equal(handTarget.y,ash.y+HAND_RELEASE_CLEARANCE);
+  const start={x:0.25,y:1.1,z:4.1};
+  const reached=sampleOverhandInsertion(start,handTarget,INCENSE_RELEASE_PROGRESS);
+  assert.deepEqual(reached,handTarget);
+  const hovered=sampleOverhandInsertion(start,handTarget,0.48);
+  assert.ok(hovered.y>reached.y);
+  const withdrawn=sampleOverhandInsertion(start,handTarget,0.81);
+  assert.ok(withdrawn.y>reached.y);
 });

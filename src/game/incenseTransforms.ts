@@ -3,6 +3,12 @@ import {easeInOut, INCENSE_RELEASE_PROGRESS} from './incenseMotion.ts';
 import {armCenserClearance,getArmSkeletonPoints} from './incenseCollision.ts';
 
 export type IncensePoint=Readonly<{x:number;y:number;z:number}>;
+/** Keep the whole forearm above the metal lip. The held stick is released here
+ * and then settles into the ash by itself; the hand never enters the bowl. */
+export const HAND_RELEASE_CLEARANCE=0.18;
+export function getSafeHandReleaseTarget(ash:IncensePoint):IncensePoint {
+  return {x:ash.x,y:ash.y+HAND_RELEASE_CLEARANCE,z:ash.z};
+}
 const HOVER_OFFSET=0.30;
 const approachEnd=0.43;
 const lowerStart=0.55;
