@@ -37,10 +37,16 @@ export default function GLBDeity({url}:{url:string}) {
   model.updateWorldMatrix(true,true);
   const right=model.getObjectByName('RightHand');
   const left=model.getObjectByName('LeftHand');
-  if(!right||!left||!isDeityHandednessCorrect(
+  const brush=model.getObjectByName('WritingBrush');
+  const scroll=model.getObjectByName('Scroll');
+  if(!right||!left||!brush||!scroll||brush.parent!==right||scroll.parent!==left) {
+    throw new Error('Deity GLB contract invalid: WritingBrush must be a child of RightHand and Scroll a child of LeftHand.');
+  }
+  if(!isDeityHandednessCorrect(
     right.getWorldPosition(new THREE.Vector3()).x,
     left.getWorldPosition(new THREE.Vector3()).x
-  )) {
+  ) || brush.getWorldPosition(new THREE.Vector3()).z<=0.2
+    || scroll.getWorldPosition(new THREE.Vector3()).z<=0.2) {
     throw new Error('Deity GLB hand orientation invalid: +Z facing model must hold brush in anatomical right (-X), scroll in left (+X).');
   }
 
