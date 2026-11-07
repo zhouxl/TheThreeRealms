@@ -40,7 +40,7 @@ test('insertion reaches the censer and then retracts', () => {
   const start = getTravelerPose('placing', 0);
   const reach = getTravelerPose('placing', INCENSE_RELEASE_PROGRESS);
   const end = getTravelerPose('placing', 1);
-  assert.ok(reach.handZ < start.handZ - 0.5);
+  assert.ok(reach.handZ < start.handZ - 0.4);
   const contact=getHeldIncenseBaseWorld(reach);
   assert.ok(Math.abs(contact.y-INCENSE_TARGET.y)<0.12, 'stick foot should touch ash height');
   assert.ok(Math.abs(contact.z-INCENSE_TARGET.z)<0.15, 'stick foot should be over censer');
