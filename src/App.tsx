@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import World, { type Direction, type InputRef } from './game/World.tsx';
-import { firstAvailableSlot, getNearestStation, INCENSE_STEPS, nextIncenseStep, normalizeWish, pickFortune, STATIONS, type Ritual, type Station } from './game/rules.ts';
+import { firstAvailableSlot, getNearestStation, INCENSE_STEPS, normalizeWish, pickFortune, STATIONS, type IncenseStep, type Ritual, type Station } from './game/rules.ts';
+import {advanceIncenseButton, type IncenseAction} from './game/incenseMotion.ts';
 import { addBlessingMemory, addFortuneMemory, addIncenseMemory, clearMemories, describeStorageError, deleteBlessingMemory, loadMemories, type Memories } from './game/db.ts';
 import { getFortune } from './game/fortuneData.ts';
 
@@ -13,12 +14,14 @@ const TEMPLATES = [
   {name:'竹韵成长',color:'#a8b49a',mark:'竹'},
   {name:'云鹤高飞',color:'#897b93',mark:'鹤'},
 ];
-const INCENSE_WORDS:Record<(typeof INCENSE_STEPS)[number], {title:string;instruction:string;button:string}> = {
+const INCENSE_WORDS:Record<IncenseStep, {title:string;instruction:string;button:string}> = {
   take: {title:'取一支香',instruction:'双手轻轻取香，感受安静的开始。',button:'取香'},
   light: {title:'点亮香火',instruction:'看香头微亮，一缕烟轻轻升起。',button:'点香'},
   hold: {title:'静心片刻',instruction:'把注意力放在此刻，想一件值得珍惜的事。',button:'继续'},
   bow: {title:'行礼',instruction:'跟随小旅人完成一段克制、平和的行礼。',button:'行礼'},
+  bowing: {title:'正在行礼',instruction:'小旅人俯身行礼，稍后自然恢复站姿。',button:'行礼中…'},
   place: {title:'插香',instruction:'将这一份心意留在香炉里。',button:'插香 · 完成'},
+  placing: {title:'正在插香',instruction:'香随手缓缓移向香炉，完成动作后保存记录。',button:'插香中…'},
   done: {title:'一炷清香',instruction:'愿此刻的安宁伴你一程。',button:'返回探索'},
 };
 
@@ -38,8 +41,10 @@ export default function App(){
   const [busy,setBusy]=useState(false);
   const [muted,setMuted]=useState(true);
   const ritualRef=useRef(ritual);
+  const busyRef=useRef(busy);
   const nearestRef=useRef(nearest);
   ritualRef.current=ritual;
+  busyRef.current=busy;
   nearestRef.current=nearest;
 
   useEffect(()=>{
@@ -67,7 +72,7 @@ export default function App(){
       const key=e.key.toLowerCase();
       if (mapping[key]){ input.current[mapping[key]]=true;e.preventDefault(); }
       if (key==='e' && entered && ritualRef.current.kind==='explore' && nearestRef.current)interact(nearestRef.current);
-      if (key==='escape') {setRitual({kind:'explore'});setMemoryOpen(false);setSettingsOpen(false);}
+      if (key==='escape' && !busyRef.current) {setRitual({kind:'explore'});setMemoryOpen(false);setSettingsOpen(false);}
     };
     const handleUp=(e:KeyboardEvent)=>{const direction=mapping[e.key.toLowerCase()];if(direction)input.current[direction]=false;};
     const blur=()=>{for(const k of Object.keys(input.current) as Direction[])input.current[k]=false;};
@@ -77,25 +82,60 @@ export default function App(){
     return ()=>{window.removeEventListener('keydown',handleDown);window.removeEventListener('keyup',handleUp);window.removeEventListener('blur',blur);};
   },[entered,interact,input]);
 
-  const leave=()=>{if(busy)return;setError(null);setRitual({kind:'explore'});};
-  const continueIncense=async()=>{
-    if (ritual.kind!=='incense'||busy)return;
-    if(ritual.step==='done'){leave();return;}
-    const next=nextIncenseStep(ritual.step);
-    if(next!=='done'){setRitual({kind:'incense',step:next});return;}
+  const leave=()=>{
+    if(busyRef.current)return;
     setError(null);
-    setBusy(true);
-    try{
-      const memory=await addIncenseMemory();
-      setMemories(prev=>({...prev,incense:[...prev.incense,memory]}));
-      setRitual({kind:'incense',step:'done'});
-    }catch(error){
-      console.error('上香纪念保存失败', error);
-      setError(`上香纪念尚未保存：${describeStorageError(error)} 可再次点击「插香 · 完成」重试。`);
-      // Keep the 'place' step until the IndexedDB transaction commits.
-    }
-    finally{setBusy(false);}
+    ritualRef.current={kind:'explore'};
+    setRitual({kind:'explore'});
   };
+
+  const continueIncense=()=>{
+    const current=ritualRef.current;
+    if(current.kind!=='incense'||busyRef.current)return;
+    if(current.step==='done'){leave();return;}
+    const next=advanceIncenseButton(current.step);
+    if(next===current.step)return; // A second click cannot skip a running action.
+    const target:Ritual={kind:'incense',step:next};
+    ritualRef.current=target;
+    setRitual(target);
+  };
+
+  /** Fired by the render-loop's animation completion event, not by a timer or click. */
+  const onIncenseActionComplete=useCallback((action:IncenseAction)=>{
+    const current=ritualRef.current;
+    if(current.kind!=='incense'||current.step!==action)return; // Cancelled or stale event.
+    if(action==='bowing'){
+      const target:Ritual={kind:'incense',step:'place'};
+      ritualRef.current=target;
+      setRitual(target);
+      return;
+    }
+    if(busyRef.current)return;
+    busyRef.current=true;
+    setBusy(true);
+    setError(null);
+    void addIncenseMemory().then(memory=>{
+      const active=ritualRef.current;
+      if(active.kind!=='incense'||active.step!=='placing')return;
+      setMemories(prev=>({...prev,incense:[...prev.incense,memory]}));
+      const target:Ritual={kind:'incense',step:'done'};
+      ritualRef.current=target;
+      setRitual(target);
+    }).catch(error=>{
+      console.error('上香纪念保存失败',error);
+      setError(`插香动作已完成，但本地记录未保存：${describeStorageError(error)} 请重试「插香 · 完成」。`);
+      const active=ritualRef.current;
+      if(active.kind==='incense' && active.step==='placing'){
+        const target:Ritual={kind:'incense',step:'place'};
+        ritualRef.current=target;
+        setRitual(target);
+      }
+    }).finally(()=>{
+      busyRef.current=false;
+      setBusy(false);
+    });
+  },[]);
+
   const drawFortune=async()=>{
     if(ritual.kind!=='fortune'||ritual.step!=='shake'||busy)return;
     const n=pickFortune(Math.random());
@@ -146,7 +186,7 @@ export default function App(){
         </div>
       </header>
       <div className="scene-wrap">
-        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
+        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} onIncenseActionComplete={onIncenseActionComplete} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
         <div className="scene-caption"><span className="caption-dash"/>山有清风 · 殿有书香</div>
         {entered && ritual.kind==='explore' && nearest && <button className="interact-hint" onClick={()=>interact(nearest)}><kbd>E</kbd>{STATIONS[nearest].label}<span>↗</span></button>}
         {entered && ritual.kind==='explore' && <div className="move-guide">W A S D 移动 · 拖动场景调整视角 · E 互动</div>}
@@ -168,8 +208,8 @@ export default function App(){
               <span className="panel-overline">清香一炷 · 静心片刻</span>
               <div className="ritual-symbol">香</div>
               <h2>{INCENSE_WORDS[ritual.step].title}</h2><p>{INCENSE_WORDS[ritual.step].instruction}</p>
-              <div className="step-progress">{INCENSE_STEPS.map(step=><span key={step} className={INCENSE_STEPS.indexOf(step)<=INCENSE_STEPS.indexOf(ritual.step)?'current':''}/>)}</div>
-              <button className="primary-button" onClick={continueIncense} disabled={busy}>{busy?'保存中…':INCENSE_WORDS[ritual.step].button}</button>
+              <div className="step-progress">{INCENSE_STEPS.map(step=><span key={step} className={INCENSE_STEPS.indexOf(step)<=INCENSE_STEPS.indexOf(ritual.step==='bowing'?'bow':ritual.step==='placing'?'place':ritual.step)?'current':''}/>)}</div>
+              <button className="primary-button" onClick={continueIncense} disabled={busy || ritual.step==='bowing' || ritual.step==='placing'}>{busy?'保存中…':INCENSE_WORDS[ritual.step].button}</button>
             </>}
             {ritual.kind==='fortune' && ritual.step==='shake' && <>
               <span className="panel-overline">文昌签 · 原创文化体验</span><div className="ritual-symbol">签</div>
