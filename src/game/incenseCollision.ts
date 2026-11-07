@@ -72,6 +72,16 @@ export function getArmSkeletonPoints(
   return {shoulder:point(shoulder),elbow:point(elbow),wrist:point(wrist)};
 }
 
+const ELBOW_CLEARANCE_MOVES=(()=>{
+  const moves:Array<{dy:number;dz:number}>=[];
+  for(const dy of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28,0.32]){
+    for(const dz of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28]){
+      moves.push({dy,dz});
+    }
+  }
+  return moves.sort((a,b)=>a.dy*a.dy+a.dz*a.dz-(b.dy*b.dy+b.dz*b.dz));
+})();
+
 /**
  * Technical low-poly rig safeguard: move the elbow joint up/back over the
  * censer lip while *counter-translating its child hand*, so the IncenseGrip
@@ -86,19 +96,13 @@ export function liftElbowClearOfCenser(
   if(!elbow.parent || hand.parent!==elbow){
     throw new Error('Arm rig requires Elbow_R -> Hand_R parent chain');
   }
+  const initial=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+  if(initial>=minClearance)return {clearance:initial,liftY:0,backZ:0};
   const originElbow=elbow.position.clone(),originHand=hand.position.clone();
   const parentInv=elbow.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
   const elbowInv=elbow.getWorldQuaternion(new THREE.Quaternion()).invert();
-  const moves:Array<{dy:number;dz:number}>=[];
-  for(const dy of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28,0.32]){
-    for(const dz of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28]){
-      moves.push({dy,dz});
-    }
-  }
-  moves.sort((a,b)=>
-    a.dy*a.dy+a.dz*a.dz-(b.dy*b.dy+b.dz*b.dz));
-  let best={clearance:-Infinity,liftY:0,backZ:0};
-  for(const move of moves){
+  let best={clearance:initial,liftY:0,backZ:0};
+  for(const move of ELBOW_CLEARANCE_MOVES){
     const offset=new THREE.Vector3(0,move.dy,move.dz);
     elbow.position.copy(originElbow).add(offset.clone().applyQuaternion(parentInv));
     hand.position.copy(originHand).sub(offset.clone().applyQuaternion(elbowInv));
