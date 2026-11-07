@@ -43,8 +43,8 @@ export function distanceToCenserSurface(p:WorldPoint):number {
  */
 export function armCenserClearance(arm:ArmSkeleton):number {
   const segments=[
-    {a:arm.shoulder,b:arm.elbow,radius:0.105},
-    {a:arm.elbow,b:arm.wrist,radius:0.082},
+    {a:arm.shoulder,b:arm.elbow,radius:0.125},
+    {a:arm.elbow,b:arm.wrist,radius:0.105},
   ];
   let smallest=Infinity;
   for(const {a,b,radius} of segments){

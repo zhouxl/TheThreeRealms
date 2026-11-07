@@ -147,7 +147,8 @@ export default function GLBTraveler({
     }
   });
 
-  if(!validation.valid || !grip || !wrist || !elbow || !hand || !shoulder){
+  if(!validation.valid || !grip || !wrist || !elbow || !hand || !shoulder
+    || hand.parent!==elbow || wrist.parent!==hand || grip.parent!==wrist){
     throw new Error(
       `Traveler GLB contract invalid; missing clips: ${validation.missingClips.join(', ')||'none'}; missing nodes: ${validation.missingNodes.join(', ')||'none'}.`,
     );
