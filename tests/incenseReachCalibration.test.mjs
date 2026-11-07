@@ -1,0 +1,64 @@
+import test from 'node:test';
+import {readFileSync} from 'node:fs';
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {getIncenseInsertionTarget,INCENSE_STAND} from '../src/game/incensePlacement.ts';
+import {positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
+import {armCenserClearance,getArmSkeletonPoints} from '../src/game/incenseCollision.ts';
+
+test('diagnostic sweep: find elbow-clear physical insertion configurations',async()=>{
+  const data=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
+  const bytes=data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
+  const loaded=await new Promise((resolve,reject)=>new GLTFLoader().parse(bytes,'',resolve,reject));
+  const player=new THREE.Group();
+  player.position.z=INCENSE_STAND.z;
+  player.add(loaded.scene);
+  const {scene}=loaded;
+  const shoulder=scene.getObjectByName('Shoulder_R'),elbow=scene.getObjectByName('Elbow_R'),
+        wrist=scene.getObjectByName('Wrist_R'),hand=scene.getObjectByName('Hand_R'),
+        grip=scene.getObjectByName('IncenseGrip');
+  const mixer=new THREE.AnimationMixer(scene);
+  const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
+  mixer.clipAction(clip).play();
+  const candidates=[];
+  for(const lift of [0.18,0.24,0.30,0.36]){
+    for(const elbowBias of [0,-0.5,-1,-1.5,-2.0]){
+      for(const forearmExtra of [0,0.06,0.12]){
+        for(const lateral of [0,-0.14,-0.24]){
+          let minClear=Infinity,maxErr=0;
+          const breakdown=[];
+          for(const slotIndex of [0,1,3,5]){
+            const slot=getIncenseInsertionTarget(slotIndex);
+            for(const p of [0.43,0.65,0.76]){
+              mixer.setTime(clip.duration*p);
+              scene.position.set(slot.x+lateral,0,-0.62);
+              shoulder.position.y=0.21+lift;
+              elbow.rotation.x+=elbowBias;
+              hand.position.y=-0.20-forearmExtra;
+              wrist.quaternion.identity();
+              player.updateMatrixWorld(true);
+              const start=grip.getWorldPosition(new THREE.Vector3());
+              const desired=sampleOverhandInsertion(start,slot,p);
+              const err=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',p,start,slot);
+              const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+              minClear=Math.min(minClear,clearance);
+              maxErr=Math.max(maxErr,err);
+              if(clearance<0.006)breakdown.push({slot:slotIndex,p,c:Number(clearance.toFixed(3)),err:Number(err.toFixed(3))});
+            }
+          }
+          candidates.push({lift,elbowBias,forearmExtra,lateral,minClear:Number(minClear.toFixed(4)),maxErr:Number(maxErr.toFixed(4)),fail:breakdown});
+        }
+      }
+    }
+  }
+  candidates.sort((a,b)=>{
+    const aScore=a.minClear-0.7*Math.max(0,a.maxErr-0.14);
+    const bScore=b.minClear-0.7*Math.max(0,b.maxErr-0.14);
+    return bScore-aScore;
+  });
+  console.log('ARM_REACH_SWEEP',JSON.stringify(candidates.slice(0,18).map(x=>({
+    lift:x.lift,elbowBias:x.elbowBias,forearmExtra:x.forearmExtra,lateral:x.lateral,
+    clearance:x.minClear,error:x.maxErr,
+    collisions:x.fail.length,
+  }))));
+});
