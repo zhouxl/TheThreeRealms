@@ -6,7 +6,7 @@ import {
   getTravelerPose, hasReleasedIncense, isIncenseActionStep,
 } from '../src/game/incenseMotion.ts';
 import {
-  INCENSE_TARGET, INCENSE_MAX_VISIBLE, getHeldIncenseBaseWorld, getVisibleIncenseSlots,
+  INCENSE_TARGET, INCENSE_MAX_VISIBLE, getHeldIncenseBaseWorld, getIncenseInsertionTarget, getVisibleIncenseSlots,
 } from '../src/game/incensePlacement.ts';
 
 test('only transient incense action steps trigger timed animation', () => {
@@ -108,4 +108,12 @@ test('GLB insertion reaches the same release marker as the saving event',()=>{
   assert.ok(sampleIncenseClipProgress('placing',0.2)<0.2,'slower preparation before reaching');
   assert.ok(getIncenseReachWeight(0.5)>0.25);
   assert.equal(getIncenseReachWeight(1),0);
+});
+
+test('each new incense moves to the next visible ash slot, not always the first',()=>{
+  assert.deepEqual(getIncenseInsertionTarget(0),INCENSE_TARGET);
+  assert.deepEqual(getIncenseInsertionTarget(1),{x:0.18,y:1.0,z:3.27});
+  assert.deepEqual(getIncenseInsertionTarget(2),{x:-0.18,y:1.0,z:3.27});
+  const last=getIncenseInsertionTarget(100);
+  assert.deepEqual(last,{x:0,y:1.0,z:2.98});
 });

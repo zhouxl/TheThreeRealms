@@ -513,7 +513,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
           <Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/>
         }>
           <GLBTraveler url={travelerGlbPath} ritual={ritual} walkingRef={isWalking}
-            actionProgress={actionProgress} incenseReleased={incenseReleased}/>
+            actionProgress={actionProgress} incenseReleased={incenseReleased}
+            incenseCount={incenseCount}/>
         </Suspense>
       </AssetBoundary> : <Traveler ritual={ritual} walkingRef={isWalking}
         actionProgress={actionProgress} incenseReleased={incenseReleased}/>}

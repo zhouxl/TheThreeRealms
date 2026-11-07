@@ -8,6 +8,7 @@ import {
 } from './assets.ts';
 import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
 import {alignHeldIncense} from './incenseTransforms.ts';
+import {getIncenseInsertionTarget} from './incensePlacement.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   walkingRef: MutableRefObject<boolean>;
   actionProgress: MutableRefObject<number>;
   incenseReleased: boolean;
+  incenseCount: number;
 };
 
 type ActionState = {name: string | null};
@@ -26,7 +28,7 @@ type ActionState = {name: string | null};
  * a GLB animation at that timeline's normalized position.
  */
 export default function GLBTraveler({
-  url,ritual,walkingRef,actionProgress,incenseReleased,
+  url,ritual,walkingRef,actionProgress,incenseReleased,incenseCount,
 }:Props) {
   const gltf=useGLTF(url);
   const model=useMemo(()=>cloneSkeleton(gltf.scene),[gltf.scene]);
@@ -36,6 +38,7 @@ export default function GLBTraveler({
     return validateTravelerContract(nodeNames,gltf.animations.map(clip=>clip.name));
   },[model,gltf.animations]);
   const grip=useMemo(()=>model.getObjectByName('IncenseGrip'),[model]);
+  const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
   const mixer=useMemo(()=>new THREE.AnimationMixer(model),[model]);
   const actions=useMemo(()=>{
     const result=new Map<string,THREE.AnimationAction>();
@@ -104,7 +107,7 @@ export default function GLBTraveler({
 
     if(grip && heldUprightRef.current){
       // Correct the whole stick and its smoke, not only the smoke transform.
-      alignHeldIncense(grip,heldUprightRef.current,incenseStep,actionProgress.current);
+      alignHeldIncense(grip,heldUprightRef.current,incenseStep,actionProgress.current,incenseTarget);
     }
   });
 

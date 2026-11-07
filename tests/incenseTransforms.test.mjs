@@ -46,3 +46,12 @@ test('leaving place animation resets the prop to hand grip',()=>{
   alignHeldIncense(grip,held,'bowing',0.5);
   assert.ok(held.position.length()<1e-8);
 });
+
+test('a non-first saved incense is released at its own slot',()=>{
+  const grip=new THREE.Group();
+  const prop=new THREE.Group();grip.add(prop);
+  const second={x:0.18,y:1.0,z:3.27};
+  alignHeldIncense(grip,prop,'placing',INCENSE_RELEASE_PROGRESS,second);
+  grip.updateMatrixWorld(true);
+  assert.ok(prop.getWorldPosition(new THREE.Vector3()).distanceTo(new THREE.Vector3(second.x,second.y,second.z))<1e-6);
+});

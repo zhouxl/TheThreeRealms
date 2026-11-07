@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {alignHeldIncense} from '../src/game/incenseTransforms.ts';
-import {INCENSE_TARGET, INCENSE_STAND} from '../src/game/incensePlacement.ts';
+import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
 import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
 
 const binary=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
@@ -71,4 +71,20 @@ test('actual skinned rig keeps incense world-up and releases at near-side ash ma
   const base=prop.getWorldPosition(new THREE.Vector3());
   const ash=new THREE.Vector3(INCENSE_TARGET.x,INCENSE_TARGET.y,INCENSE_TARGET.z);
   assert.ok(base.distanceTo(ash)<1e-5,'actual GLB reaches the persisted incense slot at release');
+});
+
+test('second incense on real GLB moves to second ash slot, while remaining upright',async()=>{
+  const loaded=await loadTraveler();
+  const parent=new THREE.Group();parent.position.z=INCENSE_STAND.z;parent.add(loaded.scene);
+  const grip=loaded.scene.getObjectByName('IncenseGrip');
+  const prop=new THREE.Group();grip.add(prop);
+  const slot=getIncenseInsertionTarget(1);
+  const mixer=new THREE.AnimationMixer(loaded.scene);
+  const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
+  mixer.clipAction(clip).play();
+  mixer.setTime(clip.duration*INCENSE_RELEASE_PROGRESS);
+  alignHeldIncense(grip,prop,'placing',INCENSE_RELEASE_PROGRESS,slot);
+  parent.updateMatrixWorld(true);
+  const at=prop.getWorldPosition(new THREE.Vector3());
+  assert.ok(at.distanceTo(new THREE.Vector3(slot.x,slot.y,slot.z))<1e-6);
 });

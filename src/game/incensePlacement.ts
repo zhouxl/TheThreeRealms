@@ -14,6 +14,13 @@ const HOLES: readonly (readonly [number,number])[] = [
   [0.12,-0.16], [-0.12,-0.16], [0,-0.22],
 ] as const;
 
+/** Target the exact slot which the burner will render after the release event. */
+export function getIncenseInsertionTarget(committedCount:number): Readonly<{x:number;y:number;z:number}> {
+  const recorded=Number.isFinite(committedCount)?Math.max(0,Math.floor(committedCount)):0;
+  const [x,z]=HOLES[Math.min(INCENSE_MAX_VISIBLE-1,recorded)];
+  return {x:CENSER_POSITION.x+x,y:INCENSE_TARGET.y,z:CENSER_POSITION.z+z};
+}
+
 /** Includes one in-progress stick after release, but not after it is saved. */
 export function getVisibleIncenseSlots(committedCount:number, releasedPreview:boolean): readonly (readonly [number,number])[] {
   const recorded=Number.isFinite(committedCount)?Math.max(0,Math.floor(committedCount)):0;

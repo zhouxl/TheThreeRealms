@@ -12,6 +12,7 @@ export function alignHeldIncense(
   propRoot:THREE.Object3D,
   step:string|null,
   progress:number,
+  target:Readonly<{x:number;y:number;z:number}>=INCENSE_TARGET,
 ):void {
   grip.updateWorldMatrix(true,false);
   const worldOrientation=grip.getWorldQuaternion(new THREE.Quaternion());
@@ -24,7 +25,7 @@ export function alignHeldIncense(
     const t=Math.max(0,Math.min(1,(progress-start)/(INCENSE_RELEASE_PROGRESS-start)));
     const weight=easeInOut(t);
     const hand=grip.getWorldPosition(new THREE.Vector3());
-    const goal=new THREE.Vector3(INCENSE_TARGET.x,INCENSE_TARGET.y,INCENSE_TARGET.z);
+    const goal=new THREE.Vector3(target.x,target.y,target.z);
     const desiredWorld=hand.lerp(goal,weight);
     propRoot.position.copy(grip.worldToLocal(desiredWorld));
   }else{
