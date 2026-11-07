@@ -107,3 +107,52 @@ test('diagnostic sweep: can twisting the elbow around the reach axis clear the r
   console.log('ARM_SWIVEL_SWEEP',JSON.stringify(candidates.filter(x=>x.err<0.14).slice(0,20)));
   console.log('ARM_SWIVEL_RELEASE',JSON.stringify(candidates.filter(x=>x.p===0.76 && x.err<0.14).slice(0,30)));
 });
+
+test('diagnostic sweep: side, grip reach and near-slot offsets at release',async()=>{
+  const data=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
+  const bytes=data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength);
+  const gltf=await new Promise((resolve,reject)=>new GLTFLoader().parse(bytes,'',resolve,reject));
+  const player=new THREE.Group();player.position.z=INCENSE_STAND.z;player.add(gltf.scene);
+  const scene=gltf.scene;
+  const shoulder=scene.getObjectByName('Shoulder_R'),elbow=scene.getObjectByName('Elbow_R'),
+      hand=scene.getObjectByName('Hand_R'),wrist=scene.getObjectByName('Wrist_R'),
+      grip=scene.getObjectByName('IncenseGrip');
+  const mixer=new THREE.AnimationMixer(scene);
+  const clip=gltf.animations.find(x=>x.name==='PlaceIncense');
+  mixer.clipAction(clip).play();
+  const scores=[];
+  for(const lift of [0.16,0.22,0.28,0.34]){
+    for(const extra of [0,0.06,0.12,0.18]){
+      for(const lateral of [-0.28,-0.18,-0.08]){
+        for(const slotZ of [3.50,3.56,3.62,3.68]){
+          const target={x:0,y:1.0,z:slotZ};
+          const p=0.76;
+          mixer.setTime(clip.duration*p);
+          shoulder.position.y=0.21+lift;hand.position.y=-0.20-extra;
+          wrist.quaternion.identity();scene.position.set(lateral,0,-0.62);
+          player.updateMatrixWorld(true);
+          const start=grip.getWorldPosition(new THREE.Vector3());
+          const desired=sampleOverhandInsertion(start,target,p);
+          const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',p,start,target);
+          const baseQ=shoulder.quaternion.clone();
+          const parentQ=shoulder.parent.getWorldQuaternion(new THREE.Quaternion());
+          const origin=shoulder.getWorldPosition(new THREE.Vector3());
+          const axis=new THREE.Vector3(target.x-origin.x,target.y-origin.y,target.z-origin.z).normalize();
+          for(const deg of [-120,-90,-60,-30,0,30,60,90,120]){
+            shoulder.quaternion.copy(baseQ);
+            const worldTwist=new THREE.Quaternion().setFromAxisAngle(axis,deg*Math.PI/180);
+            shoulder.quaternion.premultiply(parentQ.clone().invert().multiply(worldTwist).multiply(parentQ));
+            shoulder.updateWorldMatrix(true,true);
+            const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+            const finalError=grip.getWorldPosition(new THREE.Vector3()).distanceTo(
+              new THREE.Vector3(desired.x,desired.y,desired.z));
+            if(finalError<0.14)scores.push({lift,extra,lateral,slotZ,deg,c:Number(clearance.toFixed(4)),err:Number(finalError.toFixed(4))});
+          }
+        }
+      }
+    }
+  }
+  scores.sort((a,b)=>b.c-a.c);
+  console.log('PHYSICAL_CENSER_SWEEP',JSON.stringify(scores.slice(0,20)));
+  console.log('MODEST_LIFT_SWEEP',JSON.stringify(scores.filter(v=>v.lift<=0.22).slice(0,20)));
+});
