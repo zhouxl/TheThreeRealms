@@ -7,7 +7,7 @@ import {
   TRAVELER_EXPECTED_HEIGHT, evaluateModelHeight, selectTravelerClip, validateTravelerContract,
 } from './assets.ts';
 import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
-import {alignHeldIncense} from './incenseTransforms.ts';
+import {aimWristUpright,positionIncenseHand} from './incenseTransforms.ts';
 import {getIncenseInsertionTarget} from './incensePlacement.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
 
@@ -38,6 +38,9 @@ export default function GLBTraveler({
     return validateTravelerContract(nodeNames,gltf.animations.map(clip=>clip.name));
   },[model,gltf.animations]);
   const grip=useMemo(()=>model.getObjectByName('IncenseGrip'),[model]);
+  const wrist=useMemo(()=>model.getObjectByName('Wrist_R'),[model]);
+  const elbow=useMemo(()=>model.getObjectByName('Elbow_R'),[model]);
+  const shoulder=useMemo(()=>model.getObjectByName('Shoulder_R'),[model]);
   const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
   const mixer=useMemo(()=>new THREE.AnimationMixer(model),[model]);
   const actions=useMemo(()=>{
@@ -46,7 +49,7 @@ export default function GLBTraveler({
     return result;
   },[gltf.animations,mixer]);
   const active=useRef<ActionState>({name:null});
-  const heldUprightRef=useRef<THREE.Group>(null);
+  const insertionStart=useRef<THREE.Vector3|null>(null);
 
   useEffect(()=>{
     model.traverse(node=>{
@@ -67,7 +70,7 @@ export default function GLBTraveler({
   },[model,mixer]);
 
   const incenseStep=ritual.kind==='incense'?ritual.step:null;
-  const equipped=incenseStep!==null && incenseStep!=='done' && !incenseReleased;
+  const equipped=incenseStep!==null && incenseStep!=='done' && incenseStep!=='approach' && !incenseReleased;
   const lit=isHandheldIncenseLit(ritual) && !incenseReleased;
   useFrame((_,delta)=>{
     let name=selectTravelerClip(ritual.kind,incenseStep,walkingRef.current);
@@ -99,19 +102,34 @@ export default function GLBTraveler({
       mixer.update(0);
     }
 
-    // A subtle eased approach makes the existing low-poly motion less robotic.
-    // This is not IK; the technical asset still needs full rigged hand animation.
-    model.position.z=incenseStep==='placing'
-      ? -0.10*getIncenseReachWeight(actionProgress.current)
+    // The body takes one short physical step in before the hand descends from
+    // above; the feet remain in front of the censer's collision boundary.
+    const placing=incenseStep==='placing';
+    if(placing && !insertionStart.current && grip){
+      model.position.z=0;
+      model.updateWorldMatrix(true,true);
+      insertionStart.current=grip.getWorldPosition(new THREE.Vector3()).clone();
+    }
+    if(!placing)insertionStart.current=null;
+    model.position.z=placing
+      ? -0.62*getIncenseReachWeight(actionProgress.current)
       : 0;
 
-    if(grip && heldUprightRef.current){
-      // Correct the whole stick and its smoke, not only the smoke transform.
-      alignHeldIncense(grip,heldUprightRef.current,incenseStep,actionProgress.current,incenseTarget);
+    if(grip && wrist && equipped){
+      if(placing && !incenseReleased && shoulder && elbow && insertionStart.current){
+        positionIncenseHand(
+          shoulder,elbow,wrist,grip,'placing',actionProgress.current,
+          insertionStart.current,incenseTarget,
+        );
+      }else{
+        aimWristUpright(wrist,grip);
+      }
+    }else if(wrist){
+      wrist.quaternion.identity();
     }
   });
 
-  if(!validation.valid || !grip){
+  if(!validation.valid || !grip || !wrist || !elbow || !shoulder){
     throw new Error(
       `Traveler GLB contract invalid; missing clips: ${validation.missingClips.join(', ')||'none'}; missing nodes: ${validation.missingNodes.join(', ')||'none'}.`,
     );
@@ -120,7 +138,9 @@ export default function GLBTraveler({
   return <>
     <primitive object={model}/>
     {equipped && createPortal(
-      <group ref={heldUprightRef}>
+      <group>
+        {/* Base of the stick is exactly IncenseGrip, beneath the visible fingers.
+            The attached prop is not independently moved or counter-rotated. */}
         <mesh position={[0,0.24,0]} castShadow>
           <cylinderGeometry args={[0.012,0.012,0.48,6]}/>
           <meshStandardMaterial color="#ad8d54"/>

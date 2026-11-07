@@ -80,8 +80,8 @@ export function sampleIncenseClipProgress(action:IncenseAction,progress:number):
 /** Subtle approach during insertion; restore the default stand after release. */
 export function getIncenseReachWeight(progress:number):number{
   const p=clamp01(progress);
-  const advance=easeInOut(p/INCENSE_RELEASE_PROGRESS);
-  const recover=easeInOut((p-0.79)/(1-0.79));
+  const advance=easeInOut(p/0.43);
+  const recover=easeInOut((p-INCENSE_RELEASE_PROGRESS)/(1-INCENSE_RELEASE_PROGRESS));
   return advance*(1-recover);
 }
 
