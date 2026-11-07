@@ -10,8 +10,9 @@ export const INCENSE_STAND = {x:0,z:4.6} as const;
 export const INCENSE_MAX_VISIBLE = 6;
 
 const HOLES: readonly (readonly [number,number])[] = [
-  [0,0.30], [0.18,0.07], [-0.18,0.07],
-  [0.12,-0.16], [-0.12,-0.16], [0,-0.22],
+  // Near-side ash arc: reachable without stepping inside the censer.
+  [0,0.30], [0.17,0.34], [-0.17,0.34],
+  [0.31,0.27], [-0.31,0.27], [0,0.40],
 ] as const;
 
 /** Target the exact slot which the burner will render after the release event. */

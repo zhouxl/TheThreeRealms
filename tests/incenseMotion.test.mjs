@@ -112,8 +112,8 @@ test('GLB insertion reaches the same release marker as the saving event',()=>{
 
 test('each new incense moves to the next visible ash slot, not always the first',()=>{
   assert.deepEqual(getIncenseInsertionTarget(0),INCENSE_TARGET);
-  assert.deepEqual(getIncenseInsertionTarget(1),{x:0.18,y:1.0,z:3.27});
-  assert.deepEqual(getIncenseInsertionTarget(2),{x:-0.18,y:1.0,z:3.27});
+  assert.deepEqual(getIncenseInsertionTarget(1),{x:0.17,y:1.0,z:3.54});
+  assert.deepEqual(getIncenseInsertionTarget(2),{x:-0.17,y:1.0,z:3.54});
   const last=getIncenseInsertionTarget(100);
-  assert.deepEqual(last,{x:0,y:1.0,z:2.98});
+  assert.deepEqual(last,{x:0,y:1.0,z:3.6});
 });

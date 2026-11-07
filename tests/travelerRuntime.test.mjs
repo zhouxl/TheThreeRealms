@@ -68,7 +68,7 @@ test('actual GLB uses wrist joint to orient hand-held incense, without correctin
   assert.ok(wrist.quaternion.angleTo(new THREE.Quaternion())>0.1,'wrist actually changes orientation');
 });
 
-for(const count of [0,1,2]){
+for(const count of [0,1,2,3,4,5]){
   test(`skinned arm carries incense base above slot then DOWN into ash, slot ${count}`,async()=>{
     const loaded=await loadTraveler();
     const player=new THREE.Group();player.position.z=INCENSE_STAND.z;
