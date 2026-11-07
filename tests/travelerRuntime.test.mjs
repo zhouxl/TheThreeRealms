@@ -87,6 +87,7 @@ for(const count of [0,1,2,3,4,5]){
     player.updateMatrixWorld(true);
     const start=grip.getWorldPosition(new THREE.Vector3());
     let points=[];
+    const collisions=[];
     for(const progress of [0.43,0.55,0.65,INCENSE_RELEASE_PROGRESS]){
       mixer.setTime(clip.duration*progress);
       // Actual actor takes one short step toward the censer during insertion.
@@ -100,16 +101,16 @@ for(const count of [0,1,2,3,4,5]){
       assert.ok(error<0.14,`hand must reach ash neighborhood: error=${error} at p=${progress}`);
       assert.ok(actual.distanceTo(new THREE.Vector3(desired.x,desired.y,desired.z))<0.14);
       const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
-      if(clearance < 0.006) console.log('CENSER_CLEARANCE_DEBUG',JSON.stringify({
-        slot:count,progress,clearance,
+      if(clearance < 0.006)collisions.push({
+        progress,clearance,
         skeleton:getArmSkeletonPoints(shoulder,elbow,wrist),
-      }));
-      assert.ok(clearance >= 0.006,`arm must clear censer rim/body: ${clearance} at ${count}/${progress}`);
+      });
       const up=new THREE.Vector3(0,1,0).applyQuaternion(grip.getWorldQuaternion(new THREE.Quaternion()));
       assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
       assert.ok(stick.quaternion.equals(new THREE.Quaternion()));
       points.push(actual.clone());
     }
+    assert.deepEqual(collisions,[],`Arm collides: ${JSON.stringify({slot:count,collisions})}`);
     assert.ok(Math.abs(points[0].z-points[3].z)<0.14,'final section should go down, not across');
     assert.ok(points[0].y>points[3].y+0.12,'the base of the stick moves down into ash');
   });
