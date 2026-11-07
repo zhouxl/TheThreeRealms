@@ -266,7 +266,7 @@ export default function App(){
           <button className="danger-text" onClick={clearAll}>清除全部本地纪念</button>
         </section></div>}
         {settingsOpen && <div className="modal-overlay" onClick={()=>setSettingsOpen(false)}><section className="side-panel compact-panel" onClick={e=>e.stopPropagation()}><div className="side-heading"><h2>设置与说明</h2><button onClick={()=>setSettingsOpen(false)}>×</button></div>
-          <p>当前是单人 3D 灰盒原型；神像和角色由程序化模型暂代，后续替换为正式 GLB 美术资产。</p>
+          <p>当前是单人 3D 技术原型；旅人与文昌帝君默认使用可替换的低多边形 GLB 模型，尚未完成正式美术。</p>
           <div className="setting-row"><span>声音（后续接入环境音）</span><button onClick={()=>setMuted(!muted)}>{muted?'静音中':'已开启'}</button></div>
           <h3>操作</h3><p>电脑：WASD / 方向键移动，拖动场景调整镜头，靠近目标后按 E 互动。手机：左下方向按钮移动，拖动场景调整镜头。</p>
           <h3>隐私</h3><p>求签与自定义福牌文字只存储在本地 IndexedDB，清除网站数据或切换浏览器会丢失。没有登录、跨设备同步或多人展示。</p>
@@ -274,7 +274,7 @@ export default function App(){
         </section></div>}
         {error && <div className="error-banner" role="alert">{error}<button onClick={()=>setError(null)} aria-label="关闭错误提示">×</button></div>}
       </div>
-      <footer className="footer"><span>山间有清风，静处自有光。</span><span>GRAYBOX PROTOTYPE · V1.1</span></footer>
+      <footer className="footer"><span>山间有清风，静处自有光。</span><span>3D TECH PROTOTYPE · V1.5</span></footer>
     </div>
   </div>;
 }

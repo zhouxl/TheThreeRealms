@@ -1,5 +1,5 @@
 import {useEffect, useMemo} from 'react';
-import {useGLTF} from '@react-three/drei';
+import {Html,useGLTF} from '@react-three/drei';
 import * as THREE from 'three';
 import {clone as cloneSkeleton} from 'three/examples/jsm/utils/SkeletonUtils.js';
 import {
@@ -46,5 +46,8 @@ export default function GLBDeity({url}:{url:string}) {
 
   return <group position={[0,0.45,-8.3]}>
     <primitive object={model}/>
+    <Html center position={[0,2.82,0]} distanceFactor={9}>
+      <span className="statue-label">文昌帝君</span>
+    </Html>
   </group>;
 }
