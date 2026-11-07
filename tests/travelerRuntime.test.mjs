@@ -88,9 +88,13 @@ for(const count of [0,1,2,3,4,5]){
     mixer.setTime(clip.duration*0.05);
     player.updateMatrixWorld(true);
     const start=grip.getWorldPosition(new THREE.Vector3());
-    let points=[];
+    const poseAt=new Map();
     const collisions=[];
-    for(const progress of [0.43,0.55,0.65,INCENSE_RELEASE_PROGRESS,0.81,0.87,0.94]){
+    // Test intermediate frames too: slipping through the rim between keyframes
+    // is still a visual bug, even if the release marker itself looks correct.
+    const samples=[0.08,0.18,0.30,0.40,0.43,0.50,0.55,0.60,0.65,0.70,0.73,
+      INCENSE_RELEASE_PROGRESS,0.79,0.81,0.85,0.87,0.90,0.94,0.98];
+    for(const progress of samples){
       mixer.setTime(clip.duration*sampleIncenseClipProgress('placing',progress));
       // Mirror the runtime's lateral sidestep and clavicle lift.
       const weight=getIncenseReachWeight(progress);
@@ -119,11 +123,13 @@ for(const count of [0,1,2,3,4,5]){
       const up=new THREE.Vector3(0,1,0).applyQuaternion(grip.getWorldQuaternion(new THREE.Quaternion()));
       assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
       assert.ok(stick.quaternion.equals(new THREE.Quaternion()));
-      points.push(actual.clone());
+      poseAt.set(progress,actual.clone());
     }
     assert.deepEqual(collisions,[],`Arm collides: ${JSON.stringify({slot:count,collisions})}`);
-    assert.ok(Math.abs(points[0].z-points[3].z)<0.14,'final section should go down, not across');
-    assert.ok(points[4].y>points[3].y,'empty hand should withdraw up after releasing the incense');
-    assert.ok(points[0].y>points[3].y+0.12,'the base of the stick moves down into ash');
+    const hover=poseAt.get(0.43),release=poseAt.get(INCENSE_RELEASE_PROGRESS);
+    const lifting=poseAt.get(0.81);
+    assert.ok(Math.abs(hover.z-release.z)<0.14,'final section should go down, not across');
+    assert.ok(lifting.y>release.y,'empty hand should withdraw up after releasing the incense');
+    assert.ok(hover.y>release.y+0.12,'the base of the stick moves down into ash');
   });
 }
