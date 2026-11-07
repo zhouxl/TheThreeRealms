@@ -29,7 +29,8 @@ npm run preview
 - 上香：取香 → 点香 → 静心 → 行礼 → 插香 → 完成。当前为**交互状态与占位动画**，手部 IK 和真实动作待导入。
 - 求签：32 支原创签诗，随机抽取后结果固定，支持阅读及历史记录。
 - 摆福：6 种模板、60 字以内的祝愿、30 个固定挂点，支持私有存储与删除。
-- 浏览器 IndexedDB 私有记录（无后端），重新打开可恢复，清除站点数据后会丢失。\n- 本地记录 ID 优先使用 `crypto.randomUUID()`，在普通 HTTP 局域网调试地址下兼容回退至 `crypto.getRandomValues()`。
+- 浏览器 IndexedDB 私有记录（无后端），重新打开可恢复，清除站点数据后会丢失。
+- 本地记录 ID 优先使用 `crypto.randomUUID()`，在普通 HTTP 局域网调试地址下兼容回退至 `crypto.getRandomValues()`。
 - 纯逻辑单元测试和 GitHub Actions CI 配置。
 
 ## 项目结构
@@ -43,6 +44,7 @@ src/
     rules.ts             # 世界比例、碰撞与交互规则（纯函数）
     fortuneData.ts       # 32 支原创签文
     db.ts                # IndexedDB 记录
+    id.ts                # HTTP / HTTPS 兼容的本地 UUID
  tests/rules.test.mjs     # 无依赖逻辑测试
 ```
 
