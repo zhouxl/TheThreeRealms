@@ -27,21 +27,37 @@ export function planIncenseApproach(
   destination:PlayerPosition=INCENSE_APPROACH_POINT,
 ):PlayerPosition[]{
   if(isWalkableSegment(start,destination))return [destination];
-  const side=start.x<0?-1.18:1.18;
-  const before:PlayerPosition={x:side,z:Math.min(2.25,start.z)};
-  const around:PlayerPosition={x:side,z:4.5};
-  const route=[before,around,destination];
-  let previous=start;
-  for(const waypoint of route){
-    if(!isWalkableSegment(previous,waypoint)){
-      // If already abreast of the censer, keep to this side until its front,
-      // then cross at z=4.5 (outside the collision box).
-      const via={x:side,z:Math.min(previous.z,2.25)};
-      if(!isWalkableSegment(previous,via))return [];
+  // Try either side of the censer and only return a path when every segment
+  // is actually unobstructed (including the entrance and main hall).
+  const sides=start.x<0?[-1.18,1.18]:[1.18,-1.18];
+  for(const side of sides){
+    const simple=[
+      {x:side,z:Math.min(start.z,2.25)},
+      {x:side,z:4.5},
+      destination,
+    ];
+    // An actor approaching from a far rear corner must first step out from
+    // behind the shrine/altar before turning into the center aisle.
+    const hallExitZ=Math.max(start.z,-5.35);
+    const viaHall=[
+      {x:start.x,z:hallExitZ},
+      {x:side,z:hallExitZ},
+      {x:side,z:4.5},
+      destination,
+    ];
+    for(const candidate of [simple,viaHall]){
+      const route=candidate.filter((point,i)=>i===0 ||
+        Math.hypot(point.x-candidate[i-1].x,point.z-candidate[i-1].z)>0.001);
+      let prev=start;
+      let reachable=true;
+      for(const point of route){
+        if(!isWalkableSegment(prev,point)){reachable=false;break;}
+        prev=point;
+      }
+      if(reachable)return route;
     }
-    previous=waypoint;
   }
-  return route.filter((v,i)=>i===0 || Math.hypot(v.x-route[i-1].x,v.z-route[i-1].z)>0.001);
+  return []; // Refuse to teleport when no collision-safe route exists.
 }
 
 export type ApproachTick=Readonly<{position:PlayerPosition;reached:boolean;moving:boolean}>;

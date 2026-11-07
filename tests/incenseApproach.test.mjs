@@ -20,6 +20,7 @@ test('approach routes safely around censer from behind and both sides',()=>{
   for(const start of [
     {x:0,z:0.6},{x:0,z:2.2},{x:-2,z:2.6},{x:2,z:2.6},
     {x:2,z:-1},{x:-2,z:-1},
+    {x:4.0,z:-7.0},{x:-4.0,z:-7.0},
   ]){
     const path=planIncenseApproach(start);
     assert.ok(path.length>=2,JSON.stringify(start));
