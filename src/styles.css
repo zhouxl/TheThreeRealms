@@ -1,0 +1,119 @@
+:root {
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #403a31;
+  background: #ebe3d4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+html,body,#root { margin: 0; width: 100%; min-height: 100%; }
+button,input,textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid #9a5948; outline-offset: 3px; }
+.app { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: clamp(12px,2vw,30px); overflow: hidden; position: relative; }
+.sky-glow { position: absolute; inset: 0; background: radial-gradient(ellipse at 20% 10%, #f4ead1 0%, transparent 60%), linear-gradient(135deg, #e8dfce, #d8d8cc); pointer-events: none; }
+.game-shell { width: min(100%, 1480px); height: min(92vh, 900px); min-height: 650px; display: flex; flex-direction: column; position: relative; background: #efe8d9; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 85px #56493931, 0 2px 10px #51483620; border: 1px solid #fff9ed; }
+.topbar { height: 72px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; background: #f6f0e5; border-bottom: 1px solid #e7d9c3; z-index: 3; }
+.brand { display: flex; align-items: center; gap: 12px; line-height: 1.2; }
+.brand-seal { background: #a65342; border: 1px solid #b98570; border-radius: 8px; width: 38px; height: 38px; color: #fff4df; display:flex; align-items:center; justify-content:center; font-family:serif; font-size:25px; }
+.brand strong { display: block; font-family: "Songti SC", "Noto Serif CJK SC", serif; font-size: 23px; letter-spacing: .13em; font-weight: 600; }
+.brand small { display:block; font-size: 9px; letter-spacing: .17em; color: #9a8b74; margin-top: 6px; }
+.top-actions { display:flex; align-items:center; gap: 8px; }
+.top-actions button { color: #705e4b; background: transparent; border: 1px solid #e5d8c4; border-radius: 7px; padding: 9px 14px; font-size: 13px; }
+.top-actions button:hover { background: #ede4d5; }
+.top-actions span { color: #a95747; margin-left: 6px; }
+.scene-wrap { flex: 1; position: relative; min-height: 0; background: #b1c4b6; }
+.scene-wrap canvas { display: block; touch-action: none; }
+.scene-caption { position: absolute; left: 28px; top: 20px; pointer-events:none; color: #fdf4da; background:#3f514b7a; font-family:serif; font-size: 13px; padding: 9px 14px; border-radius: 5px; backdrop-filter: blur(12px); letter-spacing: .12em; display:flex; align-items:center; gap:9px; }
+.caption-dash { width: 13px; height:1px; background:#ffe5b8; }
+.move-guide { position: absolute; bottom: 22px; left: 50%; transform:translateX(-50%); background: #312f2ac2; backdrop-filter: blur(8px); color:#f5ebd8; padding: 9px 18px; border-radius: 50px; font-size: 12px; pointer-events:none; white-space:nowrap; }
+.interact-hint { position:absolute; bottom: 75px; left: 50%; transform:translateX(-50%); border: 1px solid #e2caa3; padding: 8px 18px 8px 9px; display:flex; gap: 12px; align-items:center; background: #46372bdc; color: #fbf1db; border-radius: 50px; box-shadow: 0 8px 30px #2f2c2566; white-space:nowrap; }
+.interact-hint kbd { border: 1px solid #d0bd9b; border-radius: 5px; padding: 5px 9px; font-size: 12px; background: #6d5c47; }
+.interact-hint:hover { background:#65503c; }
+.interact-hint span { color: #cfbb96; }
+.world-sign { background: #433026; border: 3px solid #ba9457; box-shadow: inset 0 0 0 1px #e2b877; padding: 4px 15px; color: #d7b276; font-size: 25px; letter-spacing: 7px; font-family:serif; white-space:nowrap; }
+.world-object-label,.statue-label { white-space:nowrap; background:#5c4734c7; color:#fae6c5; font-size:13px; font-family:serif; border-radius:5px; padding:5px 10px; }
+.statue-label { font-size:15px; }
+.intro-screen { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(90deg,#252c24b8,#4f533d45 90%); color:#f9f1de; text-align:center; padding:24px; backdrop-filter: blur(1.5px); }
+.intro-content { max-width:490px; padding: 36px 26px 32px; background:#433e30a8; border:1px solid #e9d8aa72; border-radius: 12px; box-shadow:0 20px 75px #261e1b40; }
+.eyebrow, .panel-overline { display:block; color:#c8ac81; font-size:12px; letter-spacing:.23em; }
+.intro-content h1 {font-family: "Songti SC",serif; font-size:clamp(40px,5vw,66px); font-weight:500; letter-spacing:.13em; margin:22px -12px 20px; line-height:1.25; }
+.intro-content p {font-size:15px; line-height:2.2; opacity:.9; margin-bottom:28px; }
+.intro-content small {display:block; font-size:11px; color:#ddc9ac; margin-top:18px; }
+.primary-button { border:0; background:#a65746; color:#fffbef; padding:13px 28px; border-radius:7px; font-weight:600; letter-spacing:.06em; min-width:160px; transition:background .18s; }
+.primary-button:hover:not(:disabled) { background:#bd6b58; }
+.primary-button span { margin-left:18px; }
+.ritual-backdrop {position:absolute;inset:0;display:flex;justify-content:flex-end;align-items:center;padding:24px;pointer-events:none; background: linear-gradient(90deg,transparent 37%,#2b292348 100%);}
+.ritual-panel {pointer-events:auto; position:relative; width:min(430px,100%); max-height:95%; overflow:auto; background:#f8f0e2; border:1px solid #ebdcc5; border-radius:13px; box-shadow:0 15px 65px #28261e6b; padding:35px 32px; text-align:center; color:#4e4235; }
+.ritual-panel h2 {font-family:"Songti SC",serif; font-size:27px; font-weight:600; margin:13px 0; letter-spacing:.06em; }
+.ritual-panel p {font-size:14px; line-height:1.9; color:#756955; }
+.ritual-panel small {display:block;margin-top:14px;font-size:11px;line-height:1.6;color:#9a8e7a;}
+.close-button {position:absolute;right:12px;top:10px;background:transparent;border:0;color:#82735e;font-size:27px;}
+.ritual-symbol {width:94px;height:118px;border-radius:13px;margin:24px auto 14px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#e8d0a9,#c49c69);border:2px solid #b38c5c;color:#785136;box-shadow:0 9px 22px #84684831;font-family:serif;font-size:48px;}
+.step-progress {display:flex;align-items:center;justify-content:center;gap:6px;margin:23px 0;}
+.step-progress span {width:20px;height:4px;background:#dfd4c4;border-radius:3px;}
+.step-progress span.current {background:#a75a49;}
+.fortune-poem {white-space:pre-wrap;display:block;margin:22px auto;padding:22px 10px;border-top:1px solid #dac6a7;border-bottom:1px solid #dac6a7;color:#644b39;font-family:serif;font-size:20px;letter-spacing:.1em;line-height:1.9;max-width:280px;}
+.template-list {display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:20px 0 22px;}
+.template-list button {height:63px;border-radius:8px 8px 14px 14px;border:2px solid #0000; font-family:serif;font-size:21px;color:#f7f0e4;box-shadow:0 3px 6px #36271416;}
+.template-list button.selected {border-color:#814f3d;outline:2px solid #d6b48b;outline-offset:1px;}
+.wish-label {display:flex;justify-content:space-between;align-items:center;font-size:13px;color:#75634d;margin-bottom:8px;}
+.wish-label span {font-size:11px;color:#a69a8b;}
+.ritual-panel textarea {width:100%;padding:13px 14px;background:#fffcf4;border:1px solid #e1d0b5;line-height:1.7;color:#4c4338;border-radius:7px;resize:vertical;outline-color:#a85d4d;}
+.ritual-panel .privacy-note {font-size:12px;color:#968a79;margin:10px 0 17px;}
+.modal-overlay {position:absolute;inset:0;background:#24201a71;display:flex;justify-content:flex-end;z-index:5;}
+.side-panel {background:#f8f1e6; width:min(470px,100%); overflow:auto; padding:27px 26px;box-shadow:-12px 0 45px #211f1f3d;}
+.side-heading {display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid #e1d3c1;padding-bottom:17px;margin-bottom:20px;}
+.side-heading h2 {font-family:"Songti SC",serif;font-size:28px;margin:7px 0 0;}
+.side-heading button {font-size:24px;background:transparent;border:0;color:#7c6852;}
+.memory-summary {display:grid;grid-template-columns:repeat(3,1fr);background:#eee3d2;border:1px solid #e4d4bf;border-radius:8px;padding:20px 10px;text-align:center;gap:8px;}
+.memory-summary div {display:flex;flex-direction:column;gap:6px;}
+.memory-summary strong {font-size:27px;color:#9a5746;font-weight:500;font-family:serif;}
+.memory-summary span {font-size:11px;color:#80715d;}
+.side-panel h3 {margin:28px 0 12px;font-size:15px;color:#6f523a;}
+.empty-state {font-size:13px;color:#938675;line-height:1.75;background:#f3e9da;padding:15px;border-radius:7px;}
+.memory-entry {display:flex;align-items:center;gap:12px;border-bottom:1px solid #e8dac8;padding:11px 0;}
+.memory-tag {height:44px;width:35px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;border-radius:5px;color:white;font-family:serif;}
+.memory-entry div {flex:1;min-width:0;}
+.memory-entry strong {display:block;font-weight:500;font-size:13px;overflow-wrap:anywhere;}
+.memory-entry small {display:block;font-size:11px;color:#9d8c79;margin-top:6px;}
+.memory-entry button,.setting-row button {background:transparent;border:1px solid #d5c5ae;padding:7px 10px;border-radius:5px;font-size:12px;color:#915844;}
+.fortune-entry {padding:10px 0;border-bottom:1px solid #e8dac8;display:flex;justify-content:space-between;gap:15px;font-size:13px;}
+.fortune-entry small {font-size:11px;color:#968673;white-space:nowrap;}
+.danger-text {background:transparent;border:0;text-decoration:underline;text-underline-offset:4px;color:#a65b4c;margin-top:30px;padding:5px 0;font-size:12px;}
+.compact-panel p {font-size:13px;line-height:1.9;color:#756a5b;}
+.setting-row {display:flex;align-items:center;justify-content:space-between;padding:17px 0;border-block:1px solid #e5d7c4;font-size:13px;}
+.error-banner {position:absolute;left:50%;top:24px;transform:translateX(-50%);max-width:min(550px,92%);padding:12px 15px;background:#fff3e8;border:1px solid #bd7861;color:#91503c;z-index:10;font-size:12px;border-radius:6px;box-shadow:0 7px 25px #382d2550;display:flex;gap:12px;align-items:center;}
+.error-banner button {border:0;background:transparent;font-size:19px;color:inherit;}
+.footer {height:38px;flex:0 0 auto;padding:0 27px;display:flex;justify-content:space-between;align-items:center;color:#918270;font-size:11px;background:#f6f0e5;letter-spacing:.08em;}
+.mobile-dpad {display:none;}
+@media (max-width: 760px) {
+  .app {padding:0;}
+  .game-shell {width:100%;min-height:100dvh;height:100dvh;border:0;border-radius:0;}
+  .topbar {height:62px;padding:0 13px;}
+  .brand-seal {width:32px;height:32px;font-size:21px;}
+  .brand strong {font-size:17px;}
+  .brand small {font-size:7px;letter-spacing:.08em;}
+  .top-actions {gap:4px;}
+  .top-actions button {padding:8px;font-size:12px;}
+  .scene-caption {left:12px;top:12px;font-size:11px;padding:7px 10px;}
+  .intro-content {padding:28px 16px;}
+  .intro-content h1 {font-size:40px;}
+  .intro-content p {font-size:13px;}
+  .move-guide {display:none;}
+  .interact-hint {left:auto;right:16px;transform:none;bottom:83px;padding:7px 12px;}
+  .mobile-dpad {position:absolute;bottom:24px;left:16px;display:grid;grid-template-columns:repeat(3,41px);grid-template-rows:repeat(3,41px);gap:3px;touch-action:none;}
+  .mobile-dpad button {border:1px solid #e3d2b6;background:#43382ec4;color:#fbe8cf;border-radius:10px;font-size:21px;touch-action:none;user-select:none;-webkit-user-select:none;}
+  .dpad-up {grid-column:2;grid-row:1;}.dpad-down {grid-column:2;grid-row:3;}.dpad-left {grid-column:1;grid-row:2;}.dpad-right {grid-column:3;grid-row:2;}
+  .ritual-backdrop {padding:0;align-items:flex-end;background:linear-gradient(0deg,#2928207f,transparent);}
+  .ritual-panel {width:100%;max-height:78dvh;border-radius:15px 15px 0 0;padding:26px 22px;}
+  .ritual-panel h2 {font-size:24px;}
+  .ritual-symbol {width:70px;height:86px;font-size:34px;margin:16px auto;}
+  .footer {height:28px;padding:0 12px;font-size:9px;}
+  .footer span:last-child {letter-spacing:0;}
+}
+@media (prefers-reduced-motion: reduce) {
+  *,*::before,*::after {transition-duration:.01ms!important;animation-duration:.01ms!important;}
+}

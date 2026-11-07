@@ -1,0 +1,303 @@
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
+import * as THREE from 'three';
+import {
+  floorHeight, getNearestStation, moveWithCollision, STATIONS, WORLD,
+  type PlayerPosition, type Ritual, type Station,
+} from './rules.ts';
+import type { BlessingMemory } from './db.ts';
+
+const C = {
+  timber: '#76513d', darkTimber: '#49382d', red: '#975346',
+  stone: '#858d83', tile: '#54605d', roof: '#464f50',
+  linen: '#e6dac2', gold: '#bf9d64', bamboo: '#c6a575',
+  bronze: '#80684b', green: '#617b60',
+};
+
+type BoxProps = { position: [number, number, number]; size: [number, number, number]; color: string; roughness?: number; rotation?: [number, number, number] };
+function Block({ position, size, color, roughness = 0.84, rotation }: BoxProps) {
+  return <mesh position={position} rotation={rotation} receiveShadow castShadow>
+    <boxGeometry args={size} />
+    <meshStandardMaterial color={color} roughness={roughness} />
+  </mesh>;
+}
+function Pillar({ x, z, height = 4.6 }: { x: number; z: number; height?: number }) {
+  return <group position={[x, 0.45, z]}>
+    <mesh position={[0, 0.2, 0]} receiveShadow><cylinderGeometry args={[0.39, 0.46, 0.38, 8]}/><meshStandardMaterial color="#918979" roughness={0.92}/></mesh>
+    <mesh position={[0, height/2 + 0.2, 0]} castShadow><cylinderGeometry args={[0.23,0.25,height,12]}/><meshStandardMaterial color={C.red} roughness={0.84}/></mesh>
+    <Block position={[0,height + 0.28,0]} size={[0.85,0.28,0.84]} color={C.darkTimber}/>
+  </group>;
+}
+function Hall() {
+  return <group>
+    <Block position={[0,0.2,-4.8]} size={[12.6,0.5,9.6]} color="#96948a" />
+    {Array.from({length:12},(_,i)=>{
+      const x=-5.5+(i%6)*2.2; const z= -1.05 - Math.floor(i/6)*3.7;
+      return <Block key={`floor-${i}`} position={[x,0.454,z]} size={[2.13,0.012,3.56]} color={i%2===0?'#a7a398':'#99988f'} />;
+    })}
+    <Block position={[-6.25,2.6,-4.8]} size={[0.22,4.3,9.6]} color={C.timber}/>
+    <Block position={[6.25,2.6,-4.8]} size={[0.22,4.3,9.6]} color={C.timber}/>
+    <Block position={[0,2.65,-9.52]} size={[12.6,4.3,0.18]} color={C.timber}/>
+    <Block position={[-4.4,2.4,0]} size={[3.8,4.0,0.18]} color={C.timber}/>
+    <Block position={[4.4,2.4,0]} size={[3.8,4.0,0.18]} color={C.timber}/>
+    <Block position={[0,4.37,0]} size={[12.6,0.36,0.35]} color={C.darkTimber}/>
+    <Block position={[0,4.5,-9.5]} size={[12.6,0.36,0.35]} color={C.darkTimber}/>
+    {([-5.65, -1.75, 1.75, 5.65] as const).flatMap(x => [0, -9.3].map(z=><Pillar key={`${x}-${z}`} x={x} z={z}/>))}
+    {[-3.2,0,3.2].map(zShift => <Block key={`beam-${zShift}`} position={[0,5.0,-4.8+zShift]} size={[12.7,0.3,0.4]} color={C.darkTimber}/>)}
+    {/* Simple double-pitched roof; replaceable with authored GLB. */}
+    <Block position={[-3.05,6.08,-4.8]} size={[7.0,0.22,10.8]} color={C.roof} rotation={[0,0,0.25]}/>
+    <Block position={[3.05,6.08,-4.8]} size={[7.0,0.22,10.8]} color={C.roof} rotation={[0,0,-0.25]}/>
+    <Block position={[0,6.86,-4.8]} size={[0.36,0.3,11]} color={C.gold}/>
+    <Block position={[0,4.1,-0.05]} size={[2.8,0.56,0.15]} color={C.darkTimber}/>
+    <Html center position={[0,4.12,0.1]} distanceFactor={12}>
+      <div className="world-sign">文昌殿</div>
+    </Html>
+    {/* Windows to filter morning light. */}
+    {[-7.9,-4.8,-1.7].map(z => <group key={`window-${z}`}>
+      {[-6.12,6.12].map(x => <group key={`${x}-${z}`}>
+        <Block position={[x,2.95,z]} size={[0.04,1.85,1.65]} color="#c0a982"/>
+        {[-0.45,0.05,0.55].map(v => <Block key={v} position={[x+Math.sign(x)*0.04,2.95+v,z]} size={[0.05,0.055,1.65]} color={C.darkTimber}/>)}
+      </group>)}
+    </group>)}
+    {/* Steps */}
+    {[0,1,2].map(i => <Block key={i} position={[0,0.07+i*0.15,0.78-i*0.25]} size={[3.8+i*0.1,0.15,0.58]} color={C.stone}/>)}
+    {/* Courtyard slabs */}
+    <Block position={[0,-0.12,3.6]} size={[12.6,0.24,7.2]} color="#8d9487"/>
+    {Array.from({length:18},(_,i)=>{
+      const x=-4.95+(i%6)*1.98; const z=1.0+Math.floor(i/6)*2.05;
+      return <Block key={`stone-${i}`} position={[x,0.011,z]} size={[1.91,0.016,1.95]} color={i%3===0?'#9fa397':'#969b90'}/>;
+    })}
+    <Block position={[0,0.12,6.95]} size={[2.8,0.12,1.2]} color="#a29a83"/>
+  </group>;
+}
+
+function Tree({x,z,scale=1}: {x:number;z:number;scale?:number}) {
+  return <group position={[x,0,z]} scale={scale}>
+    <mesh position={[0,1.8,0]} castShadow><cylinderGeometry args={[0.17,0.3,3.6,7]}/><meshStandardMaterial color="#62503d"/></mesh>
+    {([[-0.5,3.5,0],[0.6,3.9,0.2], [0,4.5,0], [-0.1,3.5,0.8]] as const).map((p,i)=><mesh key={i} position={[...p] as [number,number,number]} castShadow>
+      <icosahedronGeometry args={[1.1,1]}/><meshStandardMaterial color={i%2?'#9a9155':'#7c8756'} roughness={1}/>
+    </mesh>)}
+  </group>;
+}
+function Surroundings() {
+  return <group>
+    <Block position={[0,-0.5,0]} size={[120,0.6,120]} color="#687864" />
+    <Tree x={-8.6} z={1.6} scale={1.45}/>
+    <Tree x={8.2} z={5.1} scale={1.7}/>
+    <Tree x={-9.2} z={-7.5} scale={1.25}/>
+    <Tree x={8.8} z={-7.5} scale={1.3}/>
+    {([-8,-7.4,7.7,8.8] as const).map((x,i)=><mesh key={i} position={[x,0.16,5-(i%2)*2]} castShadow>
+      <dodecahedronGeometry args={[0.65,0]}/><meshStandardMaterial color="#7c8477" roughness={0.98}/>
+    </mesh>)}
+  </group>;
+}
+function Deity() {
+  return <group position={[0,0.45,-8.3]}>
+    <Block position={[0,0.2,0]} size={[2.25,0.4,1.6]} color={C.darkTimber}/>
+    <Block position={[0,1.15,-0.18]} size={[1.45,1.45,0.7]} color="#39565a"/>
+    <mesh position={[0,1.72,0.25]} castShadow><sphereGeometry args={[0.36,16,12]}/><meshStandardMaterial color="#c49f7c" roughness={0.96}/></mesh>
+    <Block position={[0,2.25,0.18]} size={[0.82,0.37,0.65]} color="#2f4447"/>
+    <Block position={[0,2.18,0.16]} size={[1.2,0.1,0.32]} color="#2f4447"/>
+    <mesh position={[0,1.38,0.54]} rotation={[0,0,Math.PI]}><coneGeometry args={[0.18,0.63,8]}/><meshStandardMaterial color="#37302c"/></mesh>
+    <Block position={[0,0.7,0.27]} size={[1.35,0.3,1.04]} color="#3f595c"/>
+    <Block position={[-0.6,1.24,0.51]} size={[0.23,0.72,0.28]} rotation={[0,0,-0.35]} color="#405c61"/>
+    <Block position={[0.6,1.25,0.48]} size={[0.23,0.72,0.28]} rotation={[0,0,0.35]} color="#405c61"/>
+    <Block position={[-0.4,1.23,0.78]} size={[0.55,0.07,0.45]} color="#d0b88e"/>
+    <mesh position={[0.51,1.3,0.73]} rotation={[0,0,0.2]}><cylinderGeometry args={[0.025,0.025,0.8,8]}/><meshStandardMaterial color={C.gold}/></mesh>
+    <Html center position={[0,2.8,0]} distanceFactor={9}><span className="statue-label">文昌帝君</span></Html>
+  </group>;
+}
+function OfferingAltar() {
+  return <group position={[0,0.45,-6.25]}>
+    <Block position={[0,0.82,0]} size={[2.6,0.16,0.95]} color={C.timber}/>
+    {[-1.05,1.05].map(x=><Block key={x} position={[x,0.42,0]} size={[0.16,0.75,0.7]} color={C.darkTimber}/>)}
+    {[-0.65,0,0.65].map((x,i)=><mesh key={i} position={[x,1.0,0]} castShadow>
+      <sphereGeometry args={[0.15,10,10]}/><meshStandardMaterial color={i===1?'#c58a52':'#b0a05a'}/>
+    </mesh>)}
+    {[-1.2,1.2].map(x=><mesh key={x} position={[x,1.16,0]}>
+      <cylinderGeometry args={[0.055,0.07,0.48,8]}/><meshStandardMaterial emissive="#ffd398" emissiveIntensity={0.48} color="#f5cd8a"/>
+    </mesh>)}
+  </group>;
+}
+function Smoke({ position }: {position:[number,number,number]}) {
+  const blobs = useRef<THREE.Group>(null);
+  useFrame(({clock})=>{
+    if (!blobs.current) return;
+    blobs.current.children.forEach((item,i)=>{
+      const phase = (clock.elapsedTime*0.24 + i/4)%1;
+      item.position.set(Math.sin(phase*5+i)*0.12,phase*1.65,0);
+      item.scale.setScalar(0.65+phase*0.85);
+      const mat=(item as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      mat.opacity=0.16*(1-phase);
+    });
+  });
+  return <group position={position} ref={blobs}>
+    {[0,1,2,3].map(i=><mesh key={i}>
+      <sphereGeometry args={[0.17,8,6]}/><meshBasicMaterial color="#e8e3d9" transparent depthWrite={false} opacity={0.1}/>
+    </mesh>)}
+  </group>;
+}
+function IncenseBurner({ lit }: {lit: boolean}) {
+  return <group position={[0,0,3.2]}>
+    <mesh position={[0,0.61,0]} castShadow><cylinderGeometry args={[0.57,0.39,0.85,16]}/><meshStandardMaterial color={C.bronze} metalness={0.46} roughness={0.55}/></mesh>
+    <mesh position={[0,1.08,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[0.57,0.065,8,20]}/><meshStandardMaterial color={C.gold} metalness={0.5} roughness={0.45}/></mesh>
+    {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}><cylinderGeometry args={[0.14,0.18,0.4,8]}/><meshStandardMaterial color={C.bronze} metalness={0.4}/></mesh>)}
+    {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}><torusGeometry args={[0.2,0.047,8,12]}/><meshStandardMaterial color={C.gold} metalness={0.6}/></mesh>)}
+    {[-0.17,0,0.17].map((x,i)=><mesh key={i} position={[x,1.20,0]}><cylinderGeometry args={[0.014,0.014,0.4,6]}/><meshStandardMaterial color={lit?'#bb5b35':'#b9a884'}/></mesh>)}
+    <Smoke position={[0,1.45,0]}/>
+  </group>;
+}
+function FortuneTable() {
+  return <group position={[-4.25,0.45,-4]}>
+    <Block position={[0,0.62,0]} size={[1.35,0.12,0.78]} color={C.timber}/>
+    {[-0.51,0.51].map(x=><Block key={x} position={[x,0.28,0]} size={[0.15,0.55,0.6]} color={C.timber}/>)}
+    <mesh position={[0,0.92,0]} castShadow><cylinderGeometry args={[0.16,0.15,0.53,14]}/><meshStandardMaterial color={C.bamboo} roughness={0.82}/></mesh>
+    {Array.from({length:9},(_,i)=>{
+      const a=i*2.399; return <mesh key={i} position={[Math.cos(a)*0.093,1.25+(i%3)*0.025,Math.sin(a)*0.093]}><cylinderGeometry args={[0.012,0.012,0.42,6]}/><meshStandardMaterial color="#d6b884"/></mesh>;
+    })}
+    <Html position={[0,1.45,0]} center distanceFactor={11}><div className="world-object-label">签筒</div></Html>
+  </group>;
+}
+function BlessingRack({blessings}: {blessings: BlessingMemory[]}) {
+  const occupied = new Map(blessings.map(b=>[b.slot,b]));
+  return <group position={[4.25,0.45,-4]}>
+    <Block position={[-1.18,0.98,0]} size={[0.13,1.96,0.18]} color={C.darkTimber}/>
+    <Block position={[1.18,0.98,0]} size={[0.13,1.96,0.18]} color={C.darkTimber}/>
+    <Block position={[0,1.91,0]} size={[2.56,0.15,0.18]} color={C.darkTimber}/>
+    <Block position={[0,0.23,0]} size={[2.52,0.16,0.48]} color={C.timber}/>
+    {Array.from({length:30},(_,i)=>{
+      const slot=i+1;
+      const local=occupied.get(slot);
+      const x=-0.97+(i%6)*0.385;
+      const y=1.55-Math.floor(i/6)*0.28;
+      return <group key={i} position={[x,y,0.16]}>
+        <mesh position={[0,0.13,0]}><cylinderGeometry args={[0.009,0.009,0.26,5]}/><meshStandardMaterial color="#a34338"/></mesh>
+        <Block position={[0,0,0]} size={[0.24,0.27,0.035]} color={local?['#e3cda8','#a75e53','#56697b','#d9b176','#95a58e','#84758a'][local.template]:'#c9ab80'}/>
+      </group>;
+    })}
+    <Html position={[0,2.13,0]} center distanceFactor={11}><div className="world-object-label">留福</div></Html>
+  </group>;
+}
+function Traveler({ ritual, walking }: {ritual:Ritual; walking:boolean}) {
+  const armPose = ritual.kind==='incense' && ritual.step !== 'done';
+  const fortunePose = ritual.kind==='fortune';
+  return <group>
+    <mesh position={[0,0.77,0]} castShadow><cylinderGeometry args={[0.23,0.29,0.65,10]}/><meshStandardMaterial color="#e8d8bc" roughness={0.95}/></mesh>
+    {[-0.14,0.14].map(x=><mesh key={`leg-${x}`} position={[x,0.27,0.01]} castShadow><cylinderGeometry args={[0.11,0.12,0.55,8]}/><meshStandardMaterial color="#7b8478"/></mesh>)}
+    {[-0.14,0.14].map(x=><mesh key={`shoe-${x}`} position={[x,0.08,-0.1]} castShadow><boxGeometry args={[0.22,0.15,0.34]}/><meshStandardMaterial color="#7c6756"/></mesh>)}
+    <mesh position={[0,1.22,0]} castShadow><sphereGeometry args={[0.28,16,14]}/><meshStandardMaterial color="#e9bf9c" roughness={0.96}/></mesh>
+    <mesh position={[0,1.39,0.02]} castShadow><sphereGeometry args={[0.285,12,10,0,Math.PI*2,0,1.35]}/><meshStandardMaterial color="#41302a"/></mesh>
+    <mesh position={[0,1.57,0.12]} castShadow><sphereGeometry args={[0.115,8,8]}/><meshStandardMaterial color="#45332b"/></mesh>
+    {[-0.1,0.1].map(x=><mesh key={`eye-${x}`} position={[x,1.25,-0.248]}><sphereGeometry args={[0.02,6,6]}/><meshBasicMaterial color="#342c26"/></mesh>)}
+    {[-0.34,0.34].map((x,i)=><mesh key={`arm-${i}`} position={[x,armPose?0.99:0.91,-0.08]} rotation={[armPose?-0.75:fortunePose?-0.3:0,0,i===0?0.15:-0.15]} castShadow>
+      <cylinderGeometry args={[0.09,0.11,0.54,8]}/><meshStandardMaterial color="#e3d1b4" roughness={0.98}/>
+    </mesh>)}
+    <Block position={[0,0.59,-0.015]} size={[0.56,0.07,0.37]} color="#936d52"/>
+    <Block position={[0.28,0.6,0.19]} size={[0.29,0.34,0.18]} color="#a7825f"/>
+    {armPose && <mesh position={[0,1.03,-0.43]}><cylinderGeometry args={[0.012,0.012,0.48,5]}/><meshStandardMaterial color="#ad8d54"/></mesh>}
+    {walking && <mesh position={[0,0.04,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.35,0.41,24]}/><meshBasicMaterial color="#d8b475" transparent opacity={0.27} side={THREE.DoubleSide}/></mesh>}
+  </group>;
+}
+
+export type Direction = 'up'|'down'|'left'|'right';
+export type InputRef = MutableRefObject<Record<Direction, boolean>>;
+export type WorldProps = {
+  input: InputRef;
+  ritual: Ritual;
+  blessings: BlessingMemory[];
+  incenseCount: number;
+  onNearby: (station:Station|null)=>void;
+  onInteract: (station:Station)=>void;
+  ready: boolean;
+};
+
+function GameWorld({input,ritual,blessings,incenseCount,onNearby,onInteract,ready}:WorldProps){
+  const player=useRef<THREE.Group>(null);
+  const position=useRef<PlayerPosition>({x:0,z:6.1});
+  const yaw=useRef(0);
+  const lastNearby=useRef<Station|null>(null);
+  const isWalking=useRef(false);
+  const {camera,gl}=useThree();
+  const onNearbyRef=useRef(onNearby);
+  onNearbyRef.current=onNearby;
+
+  useEffect(()=>{
+    let active=false,lastX=0;
+    const dom=gl.domElement;
+    const down=(e:PointerEvent)=>{ if(e.pointerType==='mouse' && e.button!==0)return; active=true;lastX=e.clientX; };
+    const move=(e:PointerEvent)=>{if(!active || ritual.kind!=='explore') return; const delta=e.clientX-lastX;lastX=e.clientX;yaw.current-=delta*0.005;};
+    const up=()=>{active=false;};
+    dom.addEventListener('pointerdown',down);
+    window.addEventListener('pointermove',move);
+    window.addEventListener('pointerup',up);
+    return ()=>{dom.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
+  },[gl,ritual.kind]);
+  useFrame((state,dt)=>{
+    const pos=position.current;
+    if (ritual.kind==='explore' && ready){
+      const keys=input.current;
+      const f=(keys.up?1:0)-(keys.down?1:0);
+      const side=(keys.right?1:0)-(keys.left?1:0);
+      const len=Math.hypot(f,side);
+      isWalking.current=len>0;
+      if(len){
+        const theta=yaw.current;
+        const dx=((Math.cos(theta)*side-Math.sin(theta)*f)/len)*WORLD.speed*Math.min(dt,0.045);
+        const dz=((-Math.sin(theta)*side-Math.cos(theta)*f)/len)*WORLD.speed*Math.min(dt,0.045);
+        position.current=moveWithCollision(pos,dx,dz);
+        if(player.current && (dx || dz)) player.current.rotation.y=THREE.MathUtils.damp(player.current.rotation.y,Math.atan2(dx,-dz),10,dt);
+      }
+    }else{isWalking.current=false;}
+    const current=position.current;
+    if(player.current){
+      player.current.position.set(current.x,floorHeight(current.z)+(isWalking.current?Math.abs(Math.sin(state.clock.elapsedTime*10))*0.025:0),current.z);
+    }
+    const nearby=getNearestStation(current);
+    if(nearby!==lastNearby.current){lastNearby.current=nearby;onNearbyRef.current(nearby);}
+    let goal:THREE.Vector3,look:THREE.Vector3;
+    if(ritual.kind==='explore'){
+      const distance=4.6,theta=yaw.current;
+      goal=new THREE.Vector3(current.x+Math.sin(theta)*distance, floorHeight(current.z)+2.65,current.z+Math.cos(theta)*distance);
+      look=new THREE.Vector3(current.x,floorHeight(current.z)+1.23,current.z-0.55);
+    }else{
+      const p=STATIONS[ritual.kind].position;
+      goal=new THREE.Vector3(p[0]+2.15,p[1]+2.15,p[2]+2.7);
+      look=new THREE.Vector3(p[0],p[1]+1.2,p[2]);
+    }
+    camera.position.lerp(goal,1-Math.exp(-4.5*dt));
+    const target=new THREE.Vector3();
+    camera.getWorldDirection(target);
+    const currentLook=camera.position.clone().add(target.multiplyScalar(4));
+    const smoothed=currentLook.lerp(look,1-Math.exp(-6*dt));
+    camera.lookAt(smoothed);
+  });
+  const handleClick=(type:Station)=>{
+    const pos=position.current;
+    if(ritual.kind!=='explore')return;
+    const st=STATIONS[type];
+    if(Math.hypot(pos.x-st.stand[0],pos.z-st.stand[2])<=st.radius)onInteract(type);
+  };
+  return <>
+    <color attach="background" args={['#c9d8ce']}/>
+    <fog attach="fog" args={['#c9d8ce',18,56]}/>
+    <hemisphereLight args={['#f7ead0','#6c6d60',1.9]}/>
+    <directionalLight position={[-8,14,9]} intensity={2.6} color="#ffdfad" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-20} shadow-camera-right={20} shadow-camera-top={22} shadow-camera-bottom={-20}/>
+    <ambientLight intensity={0.38}/>
+    <Surroundings/>
+    <Hall/>
+    <Deity/>
+    <OfferingAltar/>
+    <group onClick={()=>handleClick('incense')}><IncenseBurner lit={incenseCount>0}/></group>
+    <group onClick={()=>handleClick('fortune')}><FortuneTable/></group>
+    <group onClick={()=>handleClick('blessing')}><BlessingRack blessings={blessings}/></group>
+    <group ref={player}><Traveler ritual={ritual} walking={isWalking.current}/></group>
+  </>;
+}
+
+export default function World(props:WorldProps){
+  const dpr=useMemo<[number,number]>(()=>[1,Math.min(window.devicePixelRatio||1,1.75)],[]);
+  return <Canvas shadows dpr={dpr} camera={{position:[0,3,11],fov:55,near:0.1,far:100}} gl={{antialias:true,powerPreference:'high-performance'}} onCreated={({gl})=>{gl.setClearColor('#c9d8ce');}}>
+    <GameWorld {...props}/>
+  </Canvas>;
+}
