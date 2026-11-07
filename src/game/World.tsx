@@ -11,6 +11,7 @@ import {
   getTravelerPose, hasReleasedIncense, incenseActionProgress, isIncenseActionStep,
   type IncenseAction,
 } from './incenseMotion.ts';
+import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
 
 const C = {
   timber: '#76513d', darkTimber: '#49382d', red: '#975346',
@@ -151,14 +152,40 @@ function Smoke({position, particleRadius = 0.17, riseHeight = 1.65, drift = 0.12
     </mesh>)}
   </group>;
 }
-function IncenseBurner({ lit }: {lit: boolean}) {
-  return <group position={[0,0,3.2]}>
-    <mesh position={[0,0.61,0]} castShadow><cylinderGeometry args={[0.57,0.39,0.85,16]}/><meshStandardMaterial color={C.bronze} metalness={0.46} roughness={0.55}/></mesh>
-    <mesh position={[0,1.08,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[0.57,0.065,8,20]}/><meshStandardMaterial color={C.gold} metalness={0.5} roughness={0.45}/></mesh>
-    {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}><cylinderGeometry args={[0.14,0.18,0.4,8]}/><meshStandardMaterial color={C.bronze} metalness={0.4}/></mesh>)}
-    {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}><torusGeometry args={[0.2,0.047,8,12]}/><meshStandardMaterial color={C.gold} metalness={0.6}/></mesh>)}
-    {[-0.17,0,0.17].map((x,i)=><mesh key={i} position={[x,1.20,0]}><cylinderGeometry args={[0.014,0.014,0.4,6]}/><meshStandardMaterial color={lit?'#bb5b35':'#b9a884'}/></mesh>)}
-    {lit && <Smoke position={[0,1.45,0]}/>} 
+function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;previewPlaced:boolean}) {
+  const visibleSticks=getVisibleIncenseSlots(incenseCount,previewPlaced);
+  const smokeStick=visibleSticks[visibleSticks.length-1];
+  return <group position={[CENSER_POSITION.x,0,CENSER_POSITION.z]}>
+    <mesh position={[0,0.61,0]} castShadow>
+      <cylinderGeometry args={[0.57,0.39,0.85,16]}/>
+      <meshStandardMaterial color={C.bronze} metalness={0.46} roughness={0.55}/>
+    </mesh>
+    <mesh position={[0,1.08,0]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[0.57,0.065,8,20]}/>
+      <meshStandardMaterial color={C.gold} metalness={0.5} roughness={0.45}/>
+    </mesh>
+    {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}>
+      <cylinderGeometry args={[0.14,0.18,0.4,8]}/>
+      <meshStandardMaterial color={C.bronze} metalness={0.4}/>
+    </mesh>)}
+    {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}>
+      <torusGeometry args={[0.2,0.047,8,12]}/>
+      <meshStandardMaterial color={C.gold} metalness={0.6}/>
+    </mesh>)}
+    {/* Only committed sticks, plus a released-but-not-yet-committed preview,
+        occupy slots. Do not permanently render fake sticks in an empty censer. */}
+    {visibleSticks.map(([x,z],i)=><group key={i} position={[x,0,z]}>
+      <mesh position={[0,1.20,0]} castShadow>
+        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
+        <meshStandardMaterial color="#af8457" roughness={0.95}/>
+      </mesh>
+      <mesh position={[0,1.405,0]}>
+        <sphereGeometry args={[0.022,8,8]}/>
+        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
+      </mesh>
+    </group>)}
+    {smokeStick && <Smoke position={[smokeStick[0],1.43,smokeStick[1]]}
+      particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
   </group>;
 }
 function FortuneTable() {
@@ -325,7 +352,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     if(ritual.kind==='incense') {
       // Temporary cinematically aligned position close enough for the hand to reach the censer.
       // Replace the short snap with a walk-up clip once authored assets are available.
-      position.current={x:0,z:4.12};
+      position.current={x:INCENSE_STAND.x,z:INCENSE_STAND.z};
       if(player.current) player.current.rotation.y=0;
     }
   },[ritual.kind]);
@@ -422,7 +449,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     <Hall/>
     <Deity/>
     <OfferingAltar/>
-    <group onClick={()=>handleClick('incense')}><IncenseBurner lit={incenseCount>0 || incenseReleased}/></group>
+    <group onClick={()=>handleClick('incense')}><IncenseBurner incenseCount={incenseCount} previewPlaced={incenseReleased && ritual.kind==='incense' && ritual.step==='placing'}/></group>
     <group onClick={()=>handleClick('fortune')}><FortuneTable/></group>
     <group onClick={()=>handleClick('blessing')}><BlessingRack blessings={blessings}/></group>
     <group ref={player}><Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/></group>

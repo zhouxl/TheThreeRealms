@@ -31,7 +31,8 @@ const REST: TravelerPose = {
 const HOLD: TravelerPose = {
   torsoPitch: 0,
   armsForward: 1.03,
-  handY: 0.28,
+  // Keep the lower end of the stick above the ash until the placement reach.
+  handY: 0.49,
   handZ: -0.43,
   incenseTilt: 0,
 };
@@ -87,8 +88,9 @@ export function getTravelerPose(step: IncenseStep | null, progress: number): Tra
     return {
       torsoPitch: -0.18 * reachWeight,
       armsForward: 1.03 + 0.4 * reachWeight,
-      handY: HOLD.handY - 0.18 * reachWeight,
-      handZ: HOLD.handZ - 0.65 * reachWeight,
+      // Waist pivot lowers the hand in world space; local movement only fine-tunes contact.
+      handY: HOLD.handY - 0.02 * reachWeight,
+      handZ: HOLD.handZ - 0.49 * reachWeight,
       incenseTilt: 0.13 * reachWeight,
     };
   }
