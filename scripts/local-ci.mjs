@@ -13,6 +13,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cleanForwardedNpmAllowScripts } from './npm-env.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const logPath = resolve(root, '.local-ci', 'last-run.log');
@@ -49,13 +50,20 @@ async function run() {
   }
 
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  // Avoid npm's upstream EALLOWSCRIPTS regression for nested project installs.
+  // The project and user .npmrc policies remain authoritative.
+  const { env: npmChildEnv, removed: forwardedScriptKeys } =
+    cleanForwardedNpmAllowScripts(process.env);
+  if (forwardedScriptKeys.length) {
+    print('[local-ci] npm forwarded allow-scripts via environment; removing only the nested-process env copy to avoid EALLOWSCRIPTS. .npmrc approvals remain in effect.\n');
+  }
   const results = [];
   async function step(label, commandArgs) {
     print(`\n=== ${label} ===\n`);
     const status = await new Promise(resolveStatus => {
       const child = spawn(npm, commandArgs, {
         cwd: root, stdio: ['inherit', 'pipe', 'pipe'],
-        env: { ...process.env, FORCE_COLOR: '0' },
+        env: { ...npmChildEnv, FORCE_COLOR: '0' },
       });
       child.stdout.on('data', bytes => print(bytes));
       child.stderr.on('data', bytes => print(bytes, process.stderr));

@@ -54,3 +54,20 @@ tail -n 100 .local-ci/last-run.log
 建议验收记录包含：分支、提交 SHA、`npm run ci:local` 的 PASS/FAIL、单元测试数量、构建结果，以及手动验证的结果。此前 PR #4 的上香手臂/袖子穿过炉沿问题，需要同时用浏览器从正面和侧面检查，**本地 CI 通过不能替代 3D 视觉验收**。
 
 > 提醒：用户本地运行的测试不能由 GitHub 直接验证，应由开发者检查对应日志，确认与当前 PR HEAD 是同一次执行；如有可能，后续再补充版本锁文件以提高可复现性。
+
+## 故障排除：`EALLOWSCRIPTS`
+
+若 `npm run ci:local` 在安装依赖时立即出现：
+
+```text
+npm error code EALLOWSCRIPTS
+npm error --allow-scripts is not allowed in project-scoped installs
+```
+
+这是 npm 某些新版本的已知配置继承问题：`npm run` 会把用户 `.npmrc` 中的 `allow-scripts` 作为 `npm_config_allow_scripts` 注入下级命令，内部 `npm install` 错误地将其识别为命令行策略。参见 [npm/cli #9912](https://github.com/npm/cli/issues/9912)。
+
+本仓库的本地 CI 脚本只移除**子进程环境变量中的这一份副本**，不修改 `~/.npmrc`、项目 `.npmrc` 或 `package.json#allowScripts`，也不使用不安全的 `--dangerously-allow-all-scripts`。
+
+请更新到包含修复的开发分支提交，使用推荐的 Node 22，再执行 `npm run ci:local`。日志开头应标注 npm 配置继承修复，并继续进入测试和构建。若下一步仍报错，请重新上传 `.local-ci/last-run.log`。
+
+此前用户日志仅显示 Node v26.7.0、安装阶段 `EALLOWSCRIPTS`，测试/构建没有执行；**不能据此判断 3D 碰撞用例通过或失败**。
