@@ -5,7 +5,7 @@ import {armCenserClearance,getArmSkeletonPoints} from './incenseCollision.ts';
 export type IncensePoint=Readonly<{x:number;y:number;z:number}>;
 /** Keep the whole forearm above the metal lip. The held stick is released here
  * and then settles into the ash by itself; the hand never enters the bowl. */
-export const HAND_RELEASE_CLEARANCE=0.18;
+export const HAND_RELEASE_CLEARANCE=0.22;
 export const INCENSE_SETTLING_SECONDS=0.35;
 
 /** After the hand releases above the lip, the incense settles into ash. */
