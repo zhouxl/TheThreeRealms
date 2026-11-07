@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizePublicGlbPath, validateTravelerContract, evaluateModelHeight,
+  normalizePublicGlbPath, resolveTravelerAssetUrl, validateTravelerContract, evaluateModelHeight,
   selectTravelerClip,
 } from '../src/game/assets.ts';
 
@@ -45,4 +45,11 @@ test('animation clip switching respects ritual action precedence', () => {
   assert.equal(selectTravelerClip('incense','bow',false),'HoldIncense');
   assert.equal(selectTravelerClip('explore',null,true),'Walk');
   assert.equal(selectTravelerClip('fortune',null,false),'Idle');
+});
+
+test('V1.4 uses real technical traveler GLB by default, with explicit opt-out', () => {
+  assert.equal(resolveTravelerAssetUrl(undefined),'/models/traveler-tech-demo.glb');
+  assert.equal(resolveTravelerAssetUrl(''),null);
+  assert.equal(resolveTravelerAssetUrl('/models/custom-traveler.glb'),'/models/custom-traveler.glb');
+  assert.equal(resolveTravelerAssetUrl('https://example.com/remote.glb'),null);
 });

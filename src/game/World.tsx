@@ -12,12 +12,12 @@ import {
   type IncenseAction,
 } from './incenseMotion.ts';
 import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
-import {normalizePublicGlbPath} from './assets.ts';
+import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
 import GLBTraveler from './GLBTraveler.tsx';
 
-const travelerGlbPath=normalizePublicGlbPath(import.meta.env.VITE_TRAVELER_GLB_URL);
+const travelerGlbPath=resolveTravelerAssetUrl(import.meta.env.VITE_TRAVELER_GLB_URL);
 const deityGlbPath=normalizePublicGlbPath(import.meta.env.VITE_DEITY_GLB_URL);
 if(import.meta.env.VITE_TRAVELER_GLB_URL && !travelerGlbPath) {
   console.warn('[TheThreeRealms] Ignoring invalid VITE_TRAVELER_GLB_URL; expected /models/name.glb.');

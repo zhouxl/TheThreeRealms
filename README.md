@@ -21,6 +21,17 @@ npm run build  # TypeScript 检查和 Vite 构建
 npm run preview
 ```
 
+## V1.4：首次内置可动画 GLB 技术角色
+
+仓库现已包含真实二进制 GLB：`public/models/traveler-tech-demo.glb`（**低多边形技术验证资产，不是最终美术**）。不需要下载额外模型，运行 `npm run dev` 即默认加载并显示该小旅人。它是 glTF 2.0 带蒙皮的模型，包含 11 个关节、`IncenseGrip` 手持香挂点，以及 `Idle`、`Walk`、`HoldIncense`、`Bow`、`PlaceIncense` 动画。
+
+如果希望恢复 V1.2 程序化角色以作对比，创建 `.env.local` 并设置 `VITE_TRAVELER_GLB_URL=`（空值），然后重启开发服务器。
+
+正式美术师制作的 GLB 可以替换技术验证模型：
+`VITE_TRAVELER_GLB_URL=/models/traveler.glb`，文件放入 `public/models/` 并符合 `docs/ASSET_CONTRACT.md` 契约。文昌帝君仍为程序化占位，`VITE_DEITY_GLB_URL` 未配置时不会加载外部文件。
+
+GLB 由纯 JavaScript 生成器可重复生成：`npm run assets:demo`。此命令**会覆盖** `public/models/traveler-tech-demo.glb`，请勿把正式艺术资产保存在此文件名下。测试会验证提交的二进制与生成器一致。
+
 ## 已实现
 
 - 单场景文昌殿灰盒：12.6 × 9.6 m 大殿、12.6 × 7.2 m 前庭、殿前香炉、神像、供案、左侧签台、右侧福牌架。
@@ -65,9 +76,9 @@ src/
 
 这一阶段只有**程序化网格的可见动作**，没有真实 GLB 骨骼资产。正式资产的方向、骨骼挂点与动画事件见 `docs/ASSET_CONTRACT.md`。需要在桌面浏览器与手机实际检查穿模、镜头位置和动作节奏。
 
-## V1.3：导入自己的 GLB 模型（本分支）
+## V1.3：导入自己的 GLB 模型（已实现）
 
-本次新增**可选的** GLB 渲染器和骨骼动画适配器，仓库目前**没有正式 GLB 文件**，因此默认展示原来的程序化小旅人和文昌帝君；这不是已经完成的美术资产替换。
+项目支持**可选的**正式 GLB 渲染器和骨骼动画适配器；V1.4 默认使用内置技术验证角色 GLB，文昌帝君尚无正式 GLB 文件。
 
 要试用自制模型：
 
