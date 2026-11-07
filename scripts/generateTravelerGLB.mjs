@@ -12,7 +12,7 @@ export function generateTravelerGLB() {
     {name:"Shoulder_L",translation:[-0.29,0.21,-0.015],children:[5]},
     {name:"Hand_L",translation:[0,-0.34,-0.02]},
     {name:"Shoulder_R",translation:[0.29,0.21,-0.015],children:[14]},
-    {name:"Hand_R",translation:[0,-0.20,-0.02],children:[15]},
+    {name:"Hand_R",translation:[0,-0.32,-0.02],children:[15]},
     {name:"IncenseGrip",translation:[0,-0.015,-0.08]},
     {name:"Leg_L",translation:[-0.14,-0.11,0],children:[10]},
     {name:"Foot_L",translation:[0,-0.46,-0.07]},
@@ -111,13 +111,13 @@ export function generateTravelerGLB() {
       taperedCylinder(x,0.75,1.10,-0.025,0.12,0.14,arm,1,10);
     }else {
       taperedCylinder(x,0.88,1.10,-0.025,0.118,0.136,arm,1,10);
-      taperedCylinder(x,0.66,0.90,-0.025,0.095,0.118,J("Elbow_R"),1,10);
+      taperedCylinder(x,0.54,0.90,-0.025,0.09,0.118,J("Elbow_R"),1,10);
     }
-    sphere(x,0.67,-0.03,0.09,0.105,0.08,hand,2,6,10);
+    sphere(x,left?0.67:0.55,-0.03,0.09,0.105,0.08,hand,2,6,10);
     if(!left){
       // A visible thumb and curved finger cluster holding the BOTTOM of the stick.
-      box(x-0.036,0.66,-0.132,0.050,0.09,0.060,hand,2);
-      box(x+0.033,0.655,-0.135,0.050,0.08,0.060,hand,2);
+      box(x-0.036,0.54,-0.132,0.050,0.09,0.060,hand,2);
+      box(x+0.033,0.535,-0.135,0.050,0.08,0.060,hand,2);
     }
     taperedCylinder(sign*0.14,0.15,0.61,0,0.105,0.13,leg,0,10);
     box(sign*0.14,0.075,-0.11,0.25,0.13,0.35,foot,4);

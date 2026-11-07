@@ -115,14 +115,14 @@ export default function GLBTraveler({
     const footstep=placing?getIncenseReachWeight(actionProgress.current):0;
     // Raise the shoulder along with the elbow rather than asking a low sleeve
     // to pass straight through the censer's metal rim.
-    if(shoulder)shoulder.position.y=shoulderRestY+0.18*footstep;
+    if(shoulder)shoulder.position.y=shoulderRestY+0.22*footstep;
     model.position.z=-0.62*footstep;
     // Tiny lateral adjustment for the second/third slot: the shoulder stays
     // aligned with the slot instead of the hand reaching across the entire urn.
-    model.position.x=incenseTarget.x*footstep;
+    model.position.x=(incenseTarget.x-0.28)*footstep;
 
     if(grip && wrist && equipped){
-      if(placing && !incenseReleased && shoulder && elbow && insertionStart.current){
+      if(placing && shoulder && elbow && insertionStart.current){
         positionIncenseHand(
           shoulder,elbow,wrist,grip,'placing',actionProgress.current,
           insertionStart.current,incenseTarget,

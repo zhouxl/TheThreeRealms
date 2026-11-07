@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
 import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
-import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
+import {INCENSE_RELEASE_PROGRESS,getIncenseReachWeight,sampleIncenseClipProgress} from '../src/game/incenseMotion.ts';
 import {armCenserClearance,getArmSkeletonPoints} from '../src/game/incenseCollision.ts';
 
 const binary=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
@@ -88,12 +88,13 @@ for(const count of [0,1,2,3,4,5]){
     const start=grip.getWorldPosition(new THREE.Vector3());
     let points=[];
     const collisions=[];
-    for(const progress of [0.43,0.55,0.65,INCENSE_RELEASE_PROGRESS]){
-      mixer.setTime(clip.duration*progress);
-      // Actual actor takes one short step toward the censer during insertion.
-      loaded.scene.position.z=-0.62;
-      loaded.scene.position.x=slot.x;
-      shoulder.position.y=0.21+0.18;
+    for(const progress of [0.43,0.55,0.65,INCENSE_RELEASE_PROGRESS,0.81,0.87,0.94]){
+      mixer.setTime(clip.duration*sampleIncenseClipProgress('placing',progress));
+      // Mirror the runtime's lateral sidestep and clavicle lift.
+      const weight=getIncenseReachWeight(progress);
+      loaded.scene.position.z=-0.62*weight;
+      loaded.scene.position.x=(slot.x-0.28)*weight;
+      shoulder.position.y=0.21+0.22*weight;
       const desired=sampleOverhandInsertion(start,slot,progress);
       const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
       player.updateMatrixWorld(true);
@@ -112,6 +113,7 @@ for(const count of [0,1,2,3,4,5]){
     }
     assert.deepEqual(collisions,[],`Arm collides: ${JSON.stringify({slot:count,collisions})}`);
     assert.ok(Math.abs(points[0].z-points[3].z)<0.14,'final section should go down, not across');
+    assert.ok(points[4].y>points[3].y,'empty hand should withdraw up after releasing the incense');
     assert.ok(points[0].y>points[3].y+0.12,'the base of the stick moves down into ash');
   });
 }
