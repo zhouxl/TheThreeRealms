@@ -20,9 +20,11 @@ test('Three.js GLTFLoader loads the committed traveler as a real skinned mesh',a
   let skinned=null;
   loaded.scene.traverse(item=>{if(item.isSkinnedMesh)skinned=item;});
   assert.ok(skinned,'Expected actual THREE.SkinnedMesh, not raw primitive mesh');
-  assert.equal(skinned.skeleton.bones.length,11);
+  assert.equal(skinned.skeleton.bones.length,13);
   assert.ok(loaded.scene.getObjectByName('IncenseGrip'));
   assert.ok(loaded.scene.getObjectByName('Hand_R'));
+  assert.ok(loaded.scene.getObjectByName('Elbow_R'));
+  assert.ok(loaded.scene.getObjectByName('Wrist_R'));
   assert.deepEqual(loaded.animations.map(c=>c.name),
     ['Idle','Walk','HoldIncense','Bow','PlaceIncense']);
 });

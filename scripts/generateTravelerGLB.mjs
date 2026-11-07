@@ -1,6 +1,6 @@
 /**
  * TheThreeRealms V1.4: a reproducible technical-asset generator.
- * This is a REAL glTF 2.0 skinned GLB (11 joints, 5 action clips and a hand grip),
+ * This is a REAL glTF 2.0 skinned GLB (13 joints, five action clips, elbow and wrist).
  * but only a low-poly model for pipeline validation, not the final art asset.
  */
 export function generateTravelerGLB() {
@@ -11,16 +11,18 @@ export function generateTravelerGLB() {
     {name:"Head", translation:[0,0.34,0]},
     {name:"Shoulder_L",translation:[-0.29,0.21,-0.015],children:[5]},
     {name:"Hand_L",translation:[0,-0.34,-0.02]},
-    {name:"Shoulder_R",translation:[0.29,0.21,-0.015],children:[7]},
-    {name:"Hand_R",translation:[0,-0.34,-0.02],children:[8]},
-    {name:"IncenseGrip",translation:[0,-0.02,-0.13]},
+    {name:"Shoulder_R",translation:[0.29,0.21,-0.015],children:[14]},
+    {name:"Hand_R",translation:[0,-0.20,-0.02],children:[15]},
+    {name:"IncenseGrip",translation:[0,-0.015,-0.08]},
     {name:"Leg_L",translation:[-0.14,-0.11,0],children:[10]},
     {name:"Foot_L",translation:[0,-0.46,-0.07]},
     {name:"Leg_R",translation:[0.14,-0.11,0],children:[12]},
     {name:"Foot_R",translation:[0,-0.46,-0.07]},
-    {name:"TravelerSkinnedMesh",mesh:0,skin:0}
+    {name:"TravelerSkinnedMesh",mesh:0,skin:0},
+    {name:"Elbow_R",translation:[0,-0.22,0],children:[7]},
+    {name:"Wrist_R",translation:[0,-0.02,-0.01],children:[8]}
   ];
-  const joints=[1,2,3,4,5,6,7,9,10,11,12];
+  const joints=[1,2,3,4,5,6,14,7,15,9,10,11,12];
   const worldPos = [];
   function accumulate(index,parent){
     const n=nodes[index],t=n.translation||[0,0,0],w=t.map((v,i)=>v+parent[i]);worldPos[index]=w;
@@ -103,10 +105,20 @@ export function generateTravelerGLB() {
   // Left/right sleeves, hands and legs are attached to actual named joints.
   for(const sign of [-1,1]){
     const left=sign<0,arm=J(left?"Shoulder_L":"Shoulder_R"),
-      hand=J(left?"Hand_L":"Hand_R"),leg=J(left?"Leg_L":"Leg_R"),
+      hand=J(left?"Hand_L":"Wrist_R"),leg=J(left?"Leg_L":"Leg_R"),
       foot=J(left?"Foot_L":"Foot_R"),x=0.29*sign;
-    taperedCylinder(x,0.75,1.10,-0.025,0.12,0.14,arm,1,10);
-    sphere(x,0.72,-0.03,0.095,0.10,0.092,hand,2,6,10);
+    if(left) {
+      taperedCylinder(x,0.75,1.10,-0.025,0.12,0.14,arm,1,10);
+    }else {
+      taperedCylinder(x,0.88,1.10,-0.025,0.118,0.136,arm,1,10);
+      taperedCylinder(x,0.66,0.90,-0.025,0.095,0.118,J("Elbow_R"),1,10);
+    }
+    sphere(x,0.67,-0.03,0.09,0.105,0.08,hand,2,6,10);
+    if(!left){
+      // A visible thumb and curved finger cluster holding the BOTTOM of the stick.
+      box(x-0.036,0.66,-0.132,0.050,0.09,0.060,hand,2);
+      box(x+0.033,0.655,-0.135,0.050,0.08,0.060,hand,2);
+    }
     taperedCylinder(sign*0.14,0.15,0.61,0,0.105,0.13,leg,0,10);
     box(sign*0.14,0.075,-0.11,0.25,0.13,0.35,foot,4);
   }
@@ -201,19 +213,22 @@ export function generateTravelerGLB() {
   ]);
   clip("HoldIncense",2,[
     track(4,[0,.5,1],[.72,.70,.72]),
-    track(6,[0,.5,1],[.75,.78,.75])
+    track(6,[0,.5,1],[1.04,1.07,1.04]),
+    track(14,[0,.5,1],[.72,.75,.72])
   ]);
   clip("Bow",1.8,[
     track(2,[0,.22,.52,.72,1],[0,-.22,-.48,-.43,0]),
     track(4,[0,.30,.70,1],[.72,.87,.84,.72]),
-    track(6,[0,.30,.70,1],[.75,.91,.86,.75]),
+    track(6,[0,.30,.70,1],[1.04,1.14,1.10,1.04]),
+    track(14,[0,.30,.70,1],[.72,.85,.83,.72]),
     track(3,[0,.52,1],[0,.14,0])
   ]);
   clip("PlaceIncense",2.4,[
     track(2,[0,.35,.76,.83,1],[0,-.11,-.19,-.18,0]),
     track(4,[0,.35,.76,.83,1],[.72,.88,1.08,1.08,.72]),
-    track(6,[0,.35,.76,.83,1],[.75,1.02,1.28,1.28,.75]),
-    track(7,[0,.76,1],[0,.11,0])
+    track(6,[0,.35,.76,.83,1],[1.04,1.18,1.39,1.36,1.04]),
+    track(14,[0,.35,.76,.83,1],[.72,.90,1.05,1.05,.72]),
+    track(7,[0,.76,1],[0,.08,0])
   ]);
   gltf.buffers=[{byteLength:buffer.length}];
 

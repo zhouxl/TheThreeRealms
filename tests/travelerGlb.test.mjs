@@ -29,10 +29,10 @@ test('committed GLB bytes exactly match the reproducible generator',()=>{
 
 test('GLB contains one valid skinned mesh and 11 rig joints',()=>{
   assert.equal(json.skins.length,1);
-  assert.equal(json.skins[0].joints.length,11);
+  assert.equal(json.skins[0].joints.length,13);
   const skinned=json.nodes.find(n=>n.skin===0);
   assert.equal(skinned.mesh,0);
-  const required=['Hips','Spine','Head','Hand_L','Hand_R','Leg_L','Leg_R','IncenseGrip'];
+  const required=['Hips','Spine','Head','Hand_L','Hand_R','Elbow_R','Wrist_R','Leg_L','Leg_R','IncenseGrip'];
   for(const name of required) assert.ok(json.nodes.some(n=>n.name===name),name);
   for(const primitive of json.meshes[0].primitives){
     assert.ok(primitive.attributes.POSITION!==undefined);
@@ -78,7 +78,13 @@ test('GLB has playable idle, walk, hold, bow and place animations',()=>{
 test('hand-held incense attachment is under right hand, not world root',()=>{
   const handIndex=json.nodes.findIndex(n=>n.name==='Hand_R');
   const gripIndex=json.nodes.findIndex(n=>n.name==='IncenseGrip');
-  assert.ok(json.nodes[handIndex].children.includes(gripIndex));
+  const wristIndex=json.nodes.findIndex(n=>n.name==='Wrist_R');
+  const elbowIndex=json.nodes.findIndex(n=>n.name==='Elbow_R');
+  const shoulderIndex=json.nodes.findIndex(n=>n.name==='Shoulder_R');
+  assert.ok(json.nodes[shoulderIndex].children.includes(elbowIndex));
+  assert.ok(json.nodes[elbowIndex].children.includes(handIndex));
+  assert.ok(json.nodes[handIndex].children.includes(wristIndex));
+  assert.ok(json.nodes[wristIndex].children.includes(gripIndex));
   assert.ok(json.nodes[gripIndex].translation[2]<0);
 });
 
