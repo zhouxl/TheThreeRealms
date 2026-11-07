@@ -82,16 +82,15 @@ export default function GLBTraveler({
       active.current.name=name;
     }
     const action=actions.get(name);
+    // Advance fade weights even for timeline-sampled one-shot clips.
+    // If this stays at mixer.update(0), the new clip can remain weight=0.
+    mixer.update(Math.min(delta,0.05));
     if(action && (name==='Bow' || name==='PlaceIncense')){
       // Clip duration can differ from procedural prototype duration.
-      // Sampling by normalized time keeps the release event deterministic.
-      action.time=Math.min(
-        action.getClip().duration-0.00001,
-        clamp01(actionProgress.current)*action.getClip().duration,
-      );
+      // Re-evaluate at the same normalized timestamp as the game event marker.
+      const duration=action.getClip().duration;
+      action.time=Math.min(Math.max(0,duration-0.00001),clamp01(actionProgress.current)*duration);
       mixer.update(0);
-    } else {
-      mixer.update(Math.min(delta,0.05));
     }
 
     if(grip && smokeRef.current){

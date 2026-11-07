@@ -40,7 +40,9 @@ test('GLB expected height is validated without auto-rescaling assets', () => {
 test('animation clip switching respects ritual action precedence', () => {
   assert.equal(selectTravelerClip('incense','bowing',true),'Bow');
   assert.equal(selectTravelerClip('incense','placing',true),'PlaceIncense');
-  assert.equal(selectTravelerClip('incense','take',false),'TakeIncense');
+  assert.equal(selectTravelerClip('incense','take',false),'Idle');
+  assert.equal(selectTravelerClip('incense','hold',false),'HoldIncense');
+  assert.equal(selectTravelerClip('incense','bow',false),'HoldIncense');
   assert.equal(selectTravelerClip('explore',null,true),'Walk');
   assert.equal(selectTravelerClip('fortune',null,false),'Idle');
 });

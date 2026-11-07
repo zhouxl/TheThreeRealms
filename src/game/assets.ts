@@ -1,7 +1,7 @@
 /** Standalone, testable contract for author-supplied glTF/GLB models. */
 export const TRAVELER_REQUIRED_CLIPS = ['Idle', 'Walk', 'Bow', 'PlaceIncense'] as const;
 export const TRAVELER_REQUIRED_NODES = ['IncenseGrip'] as const;
-export const TRAVELER_OPTIONAL_CLIPS = ['TakeIncense', 'LightIncense'] as const;
+export const TRAVELER_OPTIONAL_CLIPS = ['HoldIncense', 'TakeIncense', 'LightIncense'] as const;
 export const TRAVELER_EXPECTED_HEIGHT = 1.55;
 export const DEITY_EXPECTED_HEIGHT = 2.85;
 
@@ -53,8 +53,9 @@ export function selectTravelerClip(
   if (ritualKind === 'incense') {
     if (incenseStep === 'bowing') return 'Bow';
     if (incenseStep === 'placing') return 'PlaceIncense';
-    if (incenseStep === 'take') return 'TakeIncense';
-    if (incenseStep === 'light') return 'LightIncense';
+    // Resting states must not repeatedly loop one-shot Take/Light animations.
+    if (incenseStep === 'light' || incenseStep === 'hold'
+      || incenseStep === 'bow' || incenseStep === 'place') return 'HoldIncense';
   }
   return walking && ritualKind === 'explore' ? 'Walk' : 'Idle';
 }

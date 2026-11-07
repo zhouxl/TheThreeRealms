@@ -51,7 +51,7 @@
 - 将 `.env.example` 复制为 `.env.local`，填写 `VITE_TRAVELER_GLB_URL=/models/traveler.glb`、`VITE_DEITY_GLB_URL=/models/wenchang.glb`，然后重启 dev server。
 - 仅允许 `/models/xxxx.glb` 一类同源静态路径；URL 无效、文件 404、模型加载异常或契约验证失败时，显示可玩的原有占位模型，并在 Console 输出原因。
 - 旅人强制 GLB 节点名称：**`IncenseGrip`**（香的根端，随手部动画移动）。笔直香身沿局部 +Y 延伸，香头在锚点上方 0.48m；提供真正的手指动画时，不要再在模型中烘焙另一根香。
-- 旅人强制剪辑名称：**`Idle`、`Walk`、`Bow`、`PlaceIncense`**。可选 `TakeIncense`、`LightIncense`。缺少必需剪辑将回退灰盒；可选剪辑缺失则使用 `Idle`。
+- 旅人强制剪辑名称：**`Idle`、`Walk`、`Bow`、`PlaceIncense`**。可选 `HoldIncense`、`TakeIncense`、`LightIncense`。当前 V1.3 只使用 `HoldIncense` 作为动作之间的站姿，不会循环播放一次性的取香/点香动作；后者在引入完整时间线事件后使用。缺少必需剪辑将回退灰盒；可选剪辑缺失则使用 `Idle`。
 - 完整 GLB 剪辑的时长无需强制等于原型：通过逻辑动作的 0–1 进度采样，不与业务流程互相依赖。上香释放标记保持 0.76，签文/福牌存档结构不变。
 - 旅人默认朝向 **-Z**，静态文昌帝君朝向 **+Z**；两者 Y-up，贴地原点；不要在网页里随意放大缩小模型来掩盖导出问题。
 - 由于浏览器与设备上的蒙皮、动画混合和局部手腕旋转可能不同，导入实际模型后还需要人工检查：转身、行礼前倾、插香释放、烟雾向上、镜头遮挡、低端手机帧率。
