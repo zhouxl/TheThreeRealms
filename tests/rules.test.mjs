@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { FORTUNES, getFortune } from '../src/game/fortuneData.ts';
 import {
   canOccupy, firstAvailableSlot, floorHeight, getNearestStation,
-  moveWithCollision, nextIncenseStep, normalizeWish, pickFortune,
+  isHandheldIncenseLit, moveWithCollision, nextIncenseStep, normalizeWish, pickFortune,
 } from '../src/game/rules.ts';
 
 test('hall entrance remains accessible, but walls block passage', () => {
@@ -30,6 +30,18 @@ test('incense flow cannot advance beyond done', () => {
   assert.equal(nextIncenseStep('place'), 'done');
   assert.equal(nextIncenseStep('done'), 'done');
 });
+test('held incense smoke starts after ignition and stops when placed or cancelled', () => {
+  for (const step of ['take','light','done']) {
+    assert.equal(isHandheldIncenseLit({kind:'incense',step}), false, step);
+  }
+  for (const step of ['hold','bow','place']) {
+    assert.equal(isHandheldIncenseLit({kind:'incense',step}), true, step);
+  }
+  assert.equal(isHandheldIncenseLit({kind:'explore'}), false);
+  assert.equal(isHandheldIncenseLit({kind:'fortune',step:'shake'}), false);
+  assert.equal(isHandheldIncenseLit({kind:'blessing',step:'edit'}), false);
+});
+
 test('fortune is always within the 32-slip collection', () => {
   assert.equal(pickFortune(0), 1);
   assert.equal(pickFortune(0.999999), 32);

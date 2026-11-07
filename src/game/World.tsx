@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import {
-  floorHeight, getNearestStation, moveWithCollision, STATIONS, WORLD,
+  floorHeight, getNearestStation, isHandheldIncenseLit, moveWithCollision, STATIONS, WORLD,
   type PlayerPosition, type Ritual, type Station,
 } from './rules.ts';
 import type { BlessingMemory } from './db.ts';
@@ -120,21 +120,30 @@ function OfferingAltar() {
     </mesh>)}
   </group>;
 }
-function Smoke({ position }: {position:[number,number,number]}) {
+type SmokeProps = {
+  position: [number, number, number];
+  particleRadius?: number;
+  riseHeight?: number;
+  drift?: number;
+  color?: string;
+};
+
+function Smoke({position, particleRadius = 0.17, riseHeight = 1.65, drift = 0.12, color = '#e8e3d9'}: SmokeProps) {
   const blobs = useRef<THREE.Group>(null);
   useFrame(({clock})=>{
     if (!blobs.current) return;
     blobs.current.children.forEach((item,i)=>{
-      const phase = (clock.elapsedTime*0.24 + i/4)%1;
-      item.position.set(Math.sin(phase*5+i)*0.12,phase*1.65,0);
-      item.scale.setScalar(0.65+phase*0.85);
-      const mat=(item as THREE.Mesh).material as THREE.MeshBasicMaterial;
-      mat.opacity=0.16*(1-phase);
+      const phase = (clock.elapsedTime * 0.24 + i / 4) % 1;
+      item.position.set(Math.sin(phase * 5 + i) * drift, phase * riseHeight, 0);
+      item.scale.setScalar(0.65 + phase * 0.85);
+      const mat = (item as THREE.Mesh).material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.22 * (1 - phase);
     });
   });
   return <group position={position} ref={blobs}>
     {[0,1,2,3].map(i=><mesh key={i}>
-      <sphereGeometry args={[0.17,8,6]}/><meshBasicMaterial color="#e8e3d9" transparent depthWrite={false} opacity={0.1}/>
+      <sphereGeometry args={[particleRadius,8,6]}/>
+      <meshBasicMaterial color={color} transparent depthWrite={false} opacity={0.1}/>
     </mesh>)}
   </group>;
 }
@@ -145,7 +154,7 @@ function IncenseBurner({ lit }: {lit: boolean}) {
     {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}><cylinderGeometry args={[0.14,0.18,0.4,8]}/><meshStandardMaterial color={C.bronze} metalness={0.4}/></mesh>)}
     {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}><torusGeometry args={[0.2,0.047,8,12]}/><meshStandardMaterial color={C.gold} metalness={0.6}/></mesh>)}
     {[-0.17,0,0.17].map((x,i)=><mesh key={i} position={[x,1.20,0]}><cylinderGeometry args={[0.014,0.014,0.4,6]}/><meshStandardMaterial color={lit?'#bb5b35':'#b9a884'}/></mesh>)}
-    <Smoke position={[0,1.45,0]}/>
+    {lit && <Smoke position={[0,1.45,0]}/>} 
   </group>;
 }
 function FortuneTable() {
@@ -181,6 +190,7 @@ function BlessingRack({blessings}: {blessings: BlessingMemory[]}) {
 }
 function Traveler({ ritual, walking }: {ritual:Ritual; walking:boolean}) {
   const armPose = ritual.kind==='incense' && ritual.step !== 'done';
+  const burningInHand = isHandheldIncenseLit(ritual);
   const fortunePose = ritual.kind==='fortune';
   return <group>
     <mesh position={[0,0.77,0]} castShadow><cylinderGeometry args={[0.23,0.29,0.65,10]}/><meshStandardMaterial color="#e8d8bc" roughness={0.95}/></mesh>
@@ -195,7 +205,19 @@ function Traveler({ ritual, walking }: {ritual:Ritual; walking:boolean}) {
     </mesh>)}
     <Block position={[0,0.59,-0.015]} size={[0.56,0.07,0.37]} color="#936d52"/>
     <Block position={[0.28,0.6,0.19]} size={[0.29,0.34,0.18]} color="#a7825f"/>
-    {armPose && <mesh position={[0,1.03,-0.43]}><cylinderGeometry args={[0.012,0.012,0.48,5]}/><meshStandardMaterial color="#ad8d54"/></mesh>}
+    {armPose && <mesh position={[0,1.03,-0.43]}>
+      <cylinderGeometry args={[0.012,0.012,0.48,5]}/>
+      <meshStandardMaterial color="#ad8d54"/>
+    </mesh>}
+    {burningInHand && <>
+      <mesh position={[0,1.275,-0.43]}>
+        <sphereGeometry args={[0.027,8,8]}/>
+        <meshStandardMaterial color="#d87549" emissive="#fa6e38" emissiveIntensity={1.25}/>
+      </mesh>
+      {/* Smoke is parented to the traveler, so the plume follows the incense tip
+          while the character walks/turns or performs the ritual. */}
+      <Smoke position={[0,1.30,-0.43]} particleRadius={0.055} riseHeight={0.55} drift={0.042} color="#b5b2aa"/>
+    </>}
     {walking && <mesh position={[0,0.04,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.35,0.41,24]}/><meshBasicMaterial color="#d8b475" transparent opacity={0.27} side={THREE.DoubleSide}/></mesh>}
   </group>;
 }

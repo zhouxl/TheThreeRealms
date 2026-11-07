@@ -31,6 +31,14 @@ export function nextIncenseStep(step: (typeof INCENSE_STEPS)[number]): (typeof I
   return INCENSE_STEPS[Math.min(index + 1, INCENSE_STEPS.length - 1)];
 }
 
+/** The player lights the incense on leaving the 'light' step. Until it is
+ * placed into the burner, the ember and smoke must follow the held stick. */
+export function isHandheldIncenseLit(ritual: Ritual): boolean {
+  return ritual.kind === 'incense' && (
+    ritual.step === 'hold' || ritual.step === 'bow' || ritual.step === 'place'
+  );
+}
+
 export function floorHeight(z: number): number {
   if (z >= 0.15) return 0;
   if (z <= -0.4) return WORLD.hallFloor;
