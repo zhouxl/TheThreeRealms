@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizePublicGlbPath, validateTravelerContract, evaluateModelHeight,
+  normalizePublicGlbPath, resolveTravelerAssetUrl, validateTravelerContract, evaluateModelHeight,
   selectTravelerClip,
 } from '../src/game/assets.ts';
 
@@ -22,11 +22,11 @@ test('GLB URLs must be safe same-origin public paths', () => {
 
 test('traveler contract lists all missing clips and grip anchors', () => {
   assert.deepEqual(validateTravelerContract(
-    ['Root','Spine','Hand_R','IncenseGrip'],
+    ['Root','Spine','Hand_R','Elbow_R','Wrist_R','IncenseGrip'],
     ['Idle','Walk','Bow','PlaceIncense','TakeIncense'],
   ),{valid:true,missingClips:[],missingNodes:[]});
   assert.deepEqual(validateTravelerContract(['Hand_R'],['Idle','Walk']),{
-    valid:false,missingClips:['Bow','PlaceIncense'],missingNodes:['IncenseGrip'],
+    valid:false,missingClips:['Bow','PlaceIncense'],missingNodes:['Elbow_R','Wrist_R','IncenseGrip'],
   });
 });
 
@@ -38,6 +38,7 @@ test('GLB expected height is validated without auto-rescaling assets', () => {
 });
 
 test('animation clip switching respects ritual action precedence', () => {
+  assert.equal(selectTravelerClip('incense','approach',true),'Walk');
   assert.equal(selectTravelerClip('incense','bowing',true),'Bow');
   assert.equal(selectTravelerClip('incense','placing',true),'PlaceIncense');
   assert.equal(selectTravelerClip('incense','take',false),'Idle');
@@ -45,4 +46,11 @@ test('animation clip switching respects ritual action precedence', () => {
   assert.equal(selectTravelerClip('incense','bow',false),'HoldIncense');
   assert.equal(selectTravelerClip('explore',null,true),'Walk');
   assert.equal(selectTravelerClip('fortune',null,false),'Idle');
+});
+
+test('V1.4 uses real technical traveler GLB by default, with explicit opt-out', () => {
+  assert.equal(resolveTravelerAssetUrl(undefined),'/models/traveler-tech-demo.glb');
+  assert.equal(resolveTravelerAssetUrl(''),null);
+  assert.equal(resolveTravelerAssetUrl('/models/custom-traveler.glb'),'/models/custom-traveler.glb');
+  assert.equal(resolveTravelerAssetUrl('https://example.com/remote.glb'),null);
 });

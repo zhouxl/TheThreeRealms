@@ -6,7 +6,10 @@ import {clone as cloneSkeleton} from 'three/examples/jsm/utils/SkeletonUtils.js'
 import {
   TRAVELER_EXPECTED_HEIGHT, evaluateModelHeight, selectTravelerClip, validateTravelerContract,
 } from './assets.ts';
-import {clamp01} from './incenseMotion.ts';
+import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
+import {aimWristUpright,positionIncenseHand,getSafeHandReleaseTarget} from './incenseTransforms.ts';
+import {liftElbowClearOfCenser} from './incenseCollision.ts';
+import {getIncenseInsertionTarget} from './incensePlacement.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
 
 type Props = {
@@ -15,6 +18,7 @@ type Props = {
   walkingRef: MutableRefObject<boolean>;
   actionProgress: MutableRefObject<number>;
   incenseReleased: boolean;
+  incenseCount: number;
 };
 
 type ActionState = {name: string | null};
@@ -25,7 +29,7 @@ type ActionState = {name: string | null};
  * a GLB animation at that timeline's normalized position.
  */
 export default function GLBTraveler({
-  url,ritual,walkingRef,actionProgress,incenseReleased,
+  url,ritual,walkingRef,actionProgress,incenseReleased,incenseCount,
 }:Props) {
   const gltf=useGLTF(url);
   const model=useMemo(()=>cloneSkeleton(gltf.scene),[gltf.scene]);
@@ -35,6 +39,15 @@ export default function GLBTraveler({
     return validateTravelerContract(nodeNames,gltf.animations.map(clip=>clip.name));
   },[model,gltf.animations]);
   const grip=useMemo(()=>model.getObjectByName('IncenseGrip'),[model]);
+  const wrist=useMemo(()=>model.getObjectByName('Wrist_R'),[model]);
+  const elbow=useMemo(()=>model.getObjectByName('Elbow_R'),[model]);
+  const hand=useMemo(()=>model.getObjectByName('Hand_R'),[model]);
+  const elbowRest=useMemo(()=>elbow?.position.clone(),[elbow]);
+  const handRest=useMemo(()=>hand?.position.clone(),[hand]);
+  const shoulder=useMemo(()=>model.getObjectByName('Shoulder_R'),[model]);
+  const shoulderRestY=useMemo(()=>shoulder?.position.y??0,[shoulder]);
+  const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
+  const handTarget=useMemo(()=>getSafeHandReleaseTarget(incenseTarget),[incenseTarget]);
   const mixer=useMemo(()=>new THREE.AnimationMixer(model),[model]);
   const actions=useMemo(()=>{
     const result=new Map<string,THREE.AnimationAction>();
@@ -42,8 +55,7 @@ export default function GLBTraveler({
     return result;
   },[gltf.animations,mixer]);
   const active=useRef<ActionState>({name:null});
-  const smokeRef=useRef<THREE.Group>(null);
-  const smokeRotation=useMemo(()=>new THREE.Quaternion(),[]);
+  const insertionStart=useRef<THREE.Vector3|null>(null);
 
   useEffect(()=>{
     model.traverse(node=>{
@@ -64,7 +76,7 @@ export default function GLBTraveler({
   },[model,mixer]);
 
   const incenseStep=ritual.kind==='incense'?ritual.step:null;
-  const equipped=incenseStep!==null && incenseStep!=='done' && !incenseReleased;
+  const equipped=incenseStep!==null && incenseStep!=='done' && incenseStep!=='approach' && !incenseReleased;
   const lit=isHandheldIncenseLit(ritual) && !incenseReleased;
   useFrame((_,delta)=>{
     let name=selectTravelerClip(ritual.kind,incenseStep,walkingRef.current);
@@ -89,18 +101,55 @@ export default function GLBTraveler({
       // Clip duration can differ from procedural prototype duration.
       // Re-evaluate at the same normalized timestamp as the game event marker.
       const duration=action.getClip().duration;
-      action.time=Math.min(Math.max(0,duration-0.00001),clamp01(actionProgress.current)*duration);
+      action.time=Math.min(
+        Math.max(0,duration-0.00001),
+        sampleIncenseClipProgress(name==='Bow'?'bowing':'placing',clamp01(actionProgress.current))*duration,
+      );
       mixer.update(0);
     }
 
-    if(grip && smokeRef.current){
-      // Keep smoke world-up even when the wrist bends/rotates.
-      grip.getWorldQuaternion(smokeRotation);
-      smokeRef.current.quaternion.copy(smokeRotation).invert();
+    // The body takes one short physical step in before the hand descends from
+    // above; the feet remain in front of the censer's collision boundary.
+    const placing=incenseStep==='placing';
+    if(placing && !insertionStart.current && grip){
+      model.position.z=0;
+      model.updateWorldMatrix(true,true);
+      insertionStart.current=grip.getWorldPosition(new THREE.Vector3()).clone();
+    }
+    if(!placing)insertionStart.current=null;
+    const footstep=placing?getIncenseReachWeight(actionProgress.current):0;
+    // Raise the shoulder along with the elbow rather than asking a low sleeve
+    // to pass straight through the censer's metal rim.
+    if(shoulder)shoulder.position.y=shoulderRestY+0.34*footstep;
+    model.position.z=-0.62*footstep;
+    // Tiny lateral adjustment for the second/third slot: the shoulder stays
+    // aligned with the slot instead of the hand reaching across the entire urn.
+    model.position.x=(incenseTarget.x-0.28)*footstep;
+
+    // Animated clip channels drive joint rotation; collision offsets are
+    // temporary and must never accumulate between render frames.
+    if(elbow && elbowRest)elbow.position.copy(elbowRest);
+    if(hand && handRest)hand.position.copy(handRest);
+
+    if(grip && wrist){
+      // Keep the empty hand on its collision-safe upward withdrawal path
+      // after the stick has been released into the censer.
+      if(placing && shoulder && elbow && insertionStart.current){
+        positionIncenseHand(
+          shoulder,elbow,wrist,grip,'placing',actionProgress.current,
+          insertionStart.current,handTarget,
+        );
+        if(hand)liftElbowClearOfCenser(shoulder,elbow,hand,wrist);
+      }else{
+        aimWristUpright(wrist,grip);
+      }
+    }else if(wrist){
+      wrist.quaternion.identity();
     }
   });
 
-  if(!validation.valid || !grip){
+  if(!validation.valid || !grip || !wrist || !elbow || !hand || !shoulder
+    || hand.parent!==elbow || wrist.parent!==hand || grip.parent!==wrist){
     throw new Error(
       `Traveler GLB contract invalid; missing clips: ${validation.missingClips.join(', ')||'none'}; missing nodes: ${validation.missingNodes.join(', ')||'none'}.`,
     );
@@ -110,6 +159,8 @@ export default function GLBTraveler({
     <primitive object={model}/>
     {equipped && createPortal(
       <group>
+        {/* Base of the stick is exactly IncenseGrip, beneath the visible fingers.
+            The attached prop is not independently moved or counter-rotated. */}
         <mesh position={[0,0.24,0]} castShadow>
           <cylinderGeometry args={[0.012,0.012,0.48,6]}/>
           <meshStandardMaterial color="#ad8d54"/>
@@ -119,7 +170,7 @@ export default function GLBTraveler({
             <sphereGeometry args={[0.027,8,8]}/>
             <meshStandardMaterial color="#d87549" emissive="#fa6e38" emissiveIntensity={1.25}/>
           </mesh>
-          <group ref={smokeRef} position={[0,0.49,0]}>
+          <group position={[0,0.49,0]}>
             <TravelerSmoke/>
           </group>
         </>}

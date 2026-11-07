@@ -6,7 +6,7 @@
 
 ## 快速启动
 
-需要 Node.js 20.19+。
+需要 **Node.js 22 或更新的 22.x 版本**（推荐使用 `.nvmrc` 中的 Node 22）。
 
 ```bash
 npm install
@@ -16,22 +16,35 @@ npm run dev
 打开终端显示的本地地址（通常为 `http://localhost:5173`）。
 
 ```bash
-npm test       # Node 原生测试，无浏览器依赖
-npm run build  # TypeScript 检查和 Vite 构建
+npm run ci:local  # 安装依赖 + 全量测试 + TypeScript / Vite 构建
+npm run ci:quick  # 已安装依赖时，跳过安装的快速验证
 npm run preview
 ```
+
+**重要：** Github Actions 分钟用尽，自动 `push` / `pull_request` 验证已关闭。以后以本地 `npm run ci:local` 的退出结果和 `.local-ci/last-run.log` 作为 PR 验收证据；详细步骤见 [本地 CI 说明](docs/LOCAL_CI.md)。
+
+## V1.4：首次内置可动画 GLB 技术角色
+
+仓库现已包含真实二进制 GLB：`public/models/traveler-tech-demo.glb`（**低多边形技术验证资产，不是最终美术**）。不需要下载额外模型，运行 `npm run dev` 即默认加载并显示该小旅人。它是 glTF 2.0 带蒙皮的模型，包含 13 个关节（新增右肘和右腕）、`IncenseGrip` 手持香挂点，以及 `Idle`、`Walk`、`HoldIncense`、`Bow`、`PlaceIncense` 动画。
+
+如果希望恢复 V1.2 程序化角色以作对比，创建 `.env.local` 并设置 `VITE_TRAVELER_GLB_URL=`（空值），然后重启开发服务器。
+
+正式美术师制作的 GLB 可以替换技术验证模型：
+`VITE_TRAVELER_GLB_URL=/models/traveler.glb`，文件放入 `public/models/` 并符合 `docs/ASSET_CONTRACT.md` 契约。文昌帝君仍为程序化占位，`VITE_DEITY_GLB_URL` 未配置时不会加载外部文件。
+
+GLB 由纯 JavaScript 生成器可重复生成：`npm run assets:demo`。此命令**会覆盖** `public/models/traveler-tech-demo.glb`，请勿把正式艺术资产保存在此文件名下。测试会验证提交的二进制与生成器一致。
 
 ## 已实现
 
 - 单场景文昌殿灰盒：12.6 × 9.6 m 大殿、12.6 × 7.2 m 前庭、殿前香炉、神像、供案、左侧签台、右侧福牌架。
 - 1.55 m 国风小旅人：第三人称跟随、键盘/触摸移动、简单的障碍与地形碰撞。
 - PC 通过拖动场景调整镜头、WASD / 方向键移动、E 互动；手机通过方向键和滑动操作。
-- 上香：取香 → 点香 → 静心 → **可见程序化行礼**（约 1.8 秒）→ **可见程序化插香**（约 2.4 秒）→ 完成。香与细烟随持香点移动，在插香释放节点转移到炉口，动作结束且存档成功才显示完成；真实 GLB 骨骼动画与 IK 留待后续。
+- 上香：点击香炉后**沿可通行路线走向站位**（无需瞬移）→ 取香 → 点香 → 静心 → 行礼 → 插香 → 完成。默认技术 GLB 使用肘/腕关节驱动握香：手腕调节香的角度，握住香的底部，手伸到炉灰上方后**向下插入**，到达释放节点才转移到香炉。正式美术和精细 IK 尚待完善。
 - 求签：32 支原创签诗，随机抽取后结果固定，支持阅读及历史记录。
 - 摆福：6 种模板、60 字以内的祝愿、30 个固定挂点，支持私有存储与删除。
 - 浏览器 IndexedDB 私有记录（无后端），重新打开可恢复，清除站点数据后会丢失。
 - 本地记录 ID 优先使用 `crypto.randomUUID()`，在普通 HTTP 局域网调试地址下兼容回退至 `crypto.getRandomValues()`。
-- 纯逻辑单元测试和 GitHub Actions CI 配置。
+- 纯逻辑单元测试、统一的一键本地 CI 验证；GitHub Actions 自动触发已关闭。
 
 ## 项目结构
 
@@ -65,9 +78,9 @@ src/
 
 这一阶段只有**程序化网格的可见动作**，没有真实 GLB 骨骼资产。正式资产的方向、骨骼挂点与动画事件见 `docs/ASSET_CONTRACT.md`。需要在桌面浏览器与手机实际检查穿模、镜头位置和动作节奏。
 
-## V1.3：导入自己的 GLB 模型（本分支）
+## V1.3：导入自己的 GLB 模型（已实现）
 
-本次新增**可选的** GLB 渲染器和骨骼动画适配器，仓库目前**没有正式 GLB 文件**，因此默认展示原来的程序化小旅人和文昌帝君；这不是已经完成的美术资产替换。
+项目支持**可选的**正式 GLB 渲染器和骨骼动画适配器；V1.4 默认使用内置技术验证角色 GLB，文昌帝君尚无正式 GLB 文件。
 
 要试用自制模型：
 

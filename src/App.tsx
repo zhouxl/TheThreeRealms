@@ -15,6 +15,7 @@ const TEMPLATES = [
   {name:'云鹤高飞',color:'#897b93',mark:'鹤'},
 ];
 const INCENSE_WORDS:Record<IncenseStep, {title:string;instruction:string;button:string}> = {
+  approach: {title:'走向香炉',instruction:'小旅人正在走到香炉前，抵达后再取香。',button:'行走中…'},
   take: {title:'取一支香',instruction:'双手轻轻取香，感受安静的开始。',button:'取香'},
   light: {title:'点亮香火',instruction:'看香头微亮，一缕烟轻轻升起。',button:'点香'},
   hold: {title:'静心片刻',instruction:'把注意力放在此刻，想一件值得珍惜的事。',button:'继续'},
@@ -59,7 +60,9 @@ export default function App(){
   const interact=useCallback((station:Station)=>{
     if(ritualRef.current.kind!=='explore')return;
     setError(null);
-    setRitual(station==='incense'?{kind:'incense',step:'take'}:station==='fortune'?{kind:'fortune',step:'shake'}:{kind:'blessing',step:'edit'});
+    const next:Ritual=station==='incense'?{kind:'incense',step:'approach'}:station==='fortune'?{kind:'fortune',step:'shake'}:{kind:'blessing',step:'edit'};
+    ritualRef.current=next;
+    setRitual(next);
   },[]);
 
   useEffect(()=>{
@@ -82,6 +85,13 @@ export default function App(){
     return ()=>{window.removeEventListener('keydown',handleDown);window.removeEventListener('keyup',handleUp);window.removeEventListener('blur',blur);};
   },[entered,interact,input]);
 
+  const onIncenseApproachComplete=useCallback(()=>{
+    if(ritualRef.current.kind!=='incense'||ritualRef.current.step!=='approach')return;
+    const next:Ritual={kind:'incense',step:'take'};
+    ritualRef.current=next;
+    setRitual(next);
+  },[]);
+
   const leave=()=>{
     if(busyRef.current)return;
     setError(null);
@@ -92,6 +102,7 @@ export default function App(){
   const continueIncense=()=>{
     const current=ritualRef.current;
     if(current.kind!=='incense'||busyRef.current)return;
+    if(current.step==='approach')return;
     if(current.step==='done'){leave();return;}
     const next=advanceIncenseButton(current.step);
     if(next===current.step)return; // A second click cannot skip a running action.
@@ -186,7 +197,7 @@ export default function App(){
         </div>
       </header>
       <div className="scene-wrap">
-        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} onIncenseActionComplete={onIncenseActionComplete} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
+        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} onIncenseApproachComplete={onIncenseApproachComplete} onIncenseActionComplete={onIncenseActionComplete} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
         <div className="scene-caption"><span className="caption-dash"/>山有清风 · 殿有书香</div>
         {entered && ritual.kind==='explore' && nearest && <button className="interact-hint" onClick={()=>interact(nearest)}><kbd>E</kbd>{STATIONS[nearest].label}<span>↗</span></button>}
         {entered && ritual.kind==='explore' && <div className="move-guide">W A S D 移动 · 拖动场景调整视角 · E 互动</div>}
@@ -208,8 +219,9 @@ export default function App(){
               <span className="panel-overline">清香一炷 · 静心片刻</span>
               <div className="ritual-symbol">香</div>
               <h2>{INCENSE_WORDS[ritual.step].title}</h2><p>{INCENSE_WORDS[ritual.step].instruction}</p>
-              <div className="step-progress">{INCENSE_STEPS.map(step=><span key={step} className={INCENSE_STEPS.indexOf(step)<=INCENSE_STEPS.indexOf(ritual.step==='bowing'?'bow':ritual.step==='placing'?'place':ritual.step)?'current':''}/>)}</div>
-              <button className="primary-button" onClick={continueIncense} disabled={busy || ritual.step==='bowing' || ritual.step==='placing'}>{busy?'保存中…':INCENSE_WORDS[ritual.step].button}</button>
+              <div className="step-progress">{INCENSE_STEPS.map(step=><span key={step} className={INCENSE_STEPS.indexOf(step)<=INCENSE_STEPS.indexOf(ritual.step==='approach'?'take':ritual.step==='bowing'?'bow':ritual.step==='placing'?'place':ritual.step)?'current':''}/>)}</div>
+              <button className="primary-button" onClick={continueIncense} disabled={busy || ritual.step==='approach' || ritual.step==='bowing' || ritual.step==='placing'}>{busy?'保存中…':INCENSE_WORDS[ritual.step].button}</button>
+              <small>拖动场景可环绕查看动作 · 桌面滚轮可调整远近</small>
             </>}
             {ritual.kind==='fortune' && ritual.step==='shake' && <>
               <span className="panel-overline">文昌签 · 原创文化体验</span><div className="ritual-symbol">签</div>

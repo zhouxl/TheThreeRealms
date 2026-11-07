@@ -12,12 +12,20 @@ import {
   type IncenseAction,
 } from './incenseMotion.ts';
 import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
-import {normalizePublicGlbPath} from './assets.ts';
+import {incenseSettlementOffset} from './incenseTransforms.ts';
+import {
+  DEFAULT_RITUAL_ORBIT, dragRitualOrbit, getRitualCameraPosition, zoomRitualOrbit,
+} from './ritualCamera.ts';
+import {
+  INCENSE_APPROACH_POINT, INCENSE_APPROACH_TOLERANCE,
+  planIncenseApproach, tickApproach,
+} from './incenseApproach.ts';
+import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
 import GLBTraveler from './GLBTraveler.tsx';
 
-const travelerGlbPath=normalizePublicGlbPath(import.meta.env.VITE_TRAVELER_GLB_URL);
+const travelerGlbPath=resolveTravelerAssetUrl(import.meta.env.VITE_TRAVELER_GLB_URL);
 const deityGlbPath=normalizePublicGlbPath(import.meta.env.VITE_DEITY_GLB_URL);
 if(import.meta.env.VITE_TRAVELER_GLB_URL && !travelerGlbPath) {
   console.warn('[TheThreeRealms] Ignoring invalid VITE_TRAVELER_GLB_URL; expected /models/name.glb.');
@@ -165,9 +173,44 @@ function Smoke({position, particleRadius = 0.17, riseHeight = 1.65, drift = 0.12
     </mesh>)}
   </group>;
 }
+/** A released incense falls the last short distance into the ash by itself.
+ * The hand does not have to descend into the copper urn. */
+function PlacedIncense({
+  position,smoking,settling,
+}:{
+  position:[number,number,number];smoking:boolean;settling:boolean;
+}) {
+  const group=useRef<THREE.Group>(null);
+  const seconds=useRef(0);
+  useFrame((_,dt)=>{
+    if(!group.current)return;
+    if(settling){
+      seconds.current=Math.min(0.35,seconds.current+Math.min(dt,0.05));
+      group.current.position.y=incenseSettlementOffset(seconds.current);
+    }else{
+      seconds.current=0;
+      group.current.position.y=0;
+    }
+  });
+  return <group position={position}>
+    <group ref={group} position={[0,settling?incenseSettlementOffset(0):0,0]}>
+      <mesh position={[0,1.20,0]} castShadow>
+        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
+        <meshStandardMaterial color="#af8457" roughness={0.95}/>
+      </mesh>
+      <mesh position={[0,1.405,0]}>
+        <sphereGeometry args={[0.022,8,8]}/>
+        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
+      </mesh>
+      {smoking && <Smoke position={[0,1.43,0]}
+        particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
+    </group>
+  </group>;
+}
+
 function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;previewPlaced:boolean}) {
   const visibleSticks=getVisibleIncenseSlots(incenseCount,previewPlaced);
-  const smokeStick=visibleSticks[visibleSticks.length-1];
+  const lastStickIndex=visibleSticks.length-1;
   return <group position={[CENSER_POSITION.x,0,CENSER_POSITION.z]}>
     <mesh position={[0,0.61,0]} castShadow>
       <cylinderGeometry args={[0.57,0.39,0.85,16]}/>
@@ -187,18 +230,11 @@ function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;preview
     </mesh>)}
     {/* Only committed sticks, plus a released-but-not-yet-committed preview,
         occupy slots. Do not permanently render fake sticks in an empty censer. */}
-    {visibleSticks.map(([x,z],i)=><group key={i} position={[x,0,z]}>
-      <mesh position={[0,1.20,0]} castShadow>
-        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
-        <meshStandardMaterial color="#af8457" roughness={0.95}/>
-      </mesh>
-      <mesh position={[0,1.405,0]}>
-        <sphereGeometry args={[0.022,8,8]}/>
-        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
-      </mesh>
-    </group>)}
-    {smokeStick && <Smoke position={[smokeStick[0],1.43,smokeStick[1]]}
-      particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
+    {visibleSticks.map(([x,z],i)=>
+      <PlacedIncense key={i} position={[x,0,z]}
+        smoking={i===lastStickIndex}
+        settling={previewPlaced&&i===lastStickIndex}/>
+    )}
   </group>;
 }
 function FortuneTable() {
@@ -251,7 +287,7 @@ function Traveler({
   const smokeUpright = useRef<THREE.Group>(null);
   const walkRing = useRef<THREE.Mesh>(null);
   const step = ritual.kind === 'incense' ? ritual.step : null;
-  const equipped = step !== null && step !== 'done' && !incenseReleased;
+  const equipped = step !== null && step !== 'done' && step !== 'approach' && !incenseReleased;
   const lit = isHandheldIncenseLit(ritual) && !incenseReleased;
 
   useFrame((_, dt) => {
@@ -338,17 +374,23 @@ export type WorldProps = {
   blessings: BlessingMemory[];
   incenseCount: number;
   onIncenseActionComplete: (action:IncenseAction)=>void;
+  onIncenseApproachComplete: ()=>void;
   onNearby: (station:Station|null)=>void;
   onInteract: (station:Station)=>void;
   ready: boolean;
 };
 
-function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onNearby,onInteract,ready}:WorldProps){
+function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onIncenseApproachComplete,onNearby,onInteract,ready}:WorldProps){
   const player=useRef<THREE.Group>(null);
   const position=useRef<PlayerPosition>({x:0,z:6.1});
   const yaw=useRef(0);
+  const ritualOrbit=useRef(DEFAULT_RITUAL_ORBIT);
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
+  const approachWaypoints=useRef<PlayerPosition[]>([]);
+  const approachStarted=useRef(false);
+  const approachCompleteRef=useRef(onIncenseApproachComplete);
+  approachCompleteRef.current=onIncenseApproachComplete;
   const actionProgress=useRef(0);
   const actionElapsed=useRef(0);
   const actionStep=useRef<IncenseAction|null>(null);
@@ -362,13 +404,14 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   onNearbyRef.current=onNearby;
 
   useEffect(()=>{
-    if(ritual.kind==='incense') {
-      // Temporary cinematically aligned position close enough for the hand to reach the censer.
-      // Replace the short snap with a walk-up clip once authored assets are available.
-      position.current={x:INCENSE_STAND.x,z:INCENSE_STAND.z};
-      if(player.current) player.current.rotation.y=0;
+    if(ritual.kind==='incense' && ritual.step==='approach'){
+      approachWaypoints.current=planIncenseApproach(position.current);
+      approachStarted.current=true;
+    }else{
+      approachWaypoints.current=[];
+      approachStarted.current=false;
     }
-  },[ritual.kind]);
+  },[ritual.kind,ritual.kind==='incense'?ritual.step:null]);
 
   useEffect(()=>{
     if(ritual.kind!=='incense' || ritual.step!=='placing'){
@@ -378,15 +421,43 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   },[ritual]);
 
   useEffect(()=>{
-    let active=false,lastX=0;
+    let active=false,lastX=0,lastY=0,pointerId:number|null=null;
     const dom=gl.domElement;
-    const down=(e:PointerEvent)=>{ if(e.pointerType==='mouse' && e.button!==0)return; active=true;lastX=e.clientX; };
-    const move=(e:PointerEvent)=>{if(!active || ritual.kind!=='explore') return; const delta=e.clientX-lastX;lastX=e.clientX;yaw.current-=delta*0.005;};
-    const up=()=>{active=false;};
+    const down=(e:PointerEvent)=>{
+      if(e.pointerType==='mouse' && e.button!==0)return;
+      active=true;
+      pointerId=e.pointerId;
+      lastX=e.clientX;lastY=e.clientY;
+    };
+    const move=(e:PointerEvent)=>{
+      if(!active || pointerId!==e.pointerId)return;
+      const dx=e.clientX-lastX,dy=e.clientY-lastY;
+      lastX=e.clientX;lastY=e.clientY;
+      if(ritual.kind==='explore'){
+        yaw.current-=dx*0.005;
+      }else{
+        // Rituals keep the actor stationary; dragging only orbits the camera.
+        ritualOrbit.current=dragRitualOrbit(ritualOrbit.current,dx,dy);
+      }
+    };
+    const up=(e:PointerEvent)=>{if(pointerId===e.pointerId){active=false;pointerId=null;}};
+    const wheel=(e:WheelEvent)=>{
+      if(ritual.kind==='explore')return;
+      e.preventDefault();
+      ritualOrbit.current=zoomRitualOrbit(ritualOrbit.current,e.deltaY);
+    };
     dom.addEventListener('pointerdown',down);
     window.addEventListener('pointermove',move);
     window.addEventListener('pointerup',up);
-    return ()=>{dom.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
+    window.addEventListener('pointercancel',up);
+    dom.addEventListener('wheel',wheel,{passive:false});
+    return ()=>{
+      dom.removeEventListener('pointerdown',down);
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',up);
+      window.removeEventListener('pointercancel',up);
+      dom.removeEventListener('wheel',wheel);
+    };
   },[gl,ritual.kind]);
   useFrame((state,dt)=>{
     const currentAction=ritual.kind==='incense' && isIncenseActionStep(ritual.step) ? ritual.step : null;
@@ -409,7 +480,31 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       }
     }
     const pos=position.current;
-    if (ritual.kind==='explore' && ready){
+    if (ritual.kind==='incense' && ritual.step==='approach' && ready){
+      if(approachStarted.current){
+        const point=approachWaypoints.current[0];
+        if(point){
+          const tick=tickApproach(pos,point,Math.min(dt,0.045));
+          position.current=tick.position;
+          isWalking.current=tick.moving;
+          if(tick.moving && player.current){
+            const dx=tick.position.x-pos.x,dz=tick.position.z-pos.z;
+            player.current.rotation.y=THREE.MathUtils.damp(
+              player.current.rotation.y,Math.atan2(dx,-dz),10,dt,
+            );
+          }
+          if(tick.reached)approachWaypoints.current.shift();
+        }else{
+          isWalking.current=false;
+          const remaining=Math.hypot(pos.x-INCENSE_APPROACH_POINT.x,pos.z-INCENSE_APPROACH_POINT.z);
+          if(remaining<=INCENSE_APPROACH_TOLERANCE){
+            approachStarted.current=false; // exactly one completion event
+            if(player.current)player.current.rotation.y=0; // face censer
+            approachCompleteRef.current();
+          }
+        }
+      }
+    }else if (ritual.kind==='explore' && ready){
       const keys=input.current;
       const f=(keys.up?1:0)-(keys.down?1:0);
       const side=(keys.right?1:0)-(keys.left?1:0);
@@ -430,14 +525,18 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     const nearby=getNearestStation(current);
     if(nearby!==lastNearby.current){lastNearby.current=nearby;onNearbyRef.current(nearby);}
     let goal:THREE.Vector3,look:THREE.Vector3;
-    if(ritual.kind==='explore'){
+    if(ritual.kind==='explore' || (ritual.kind==='incense' && ritual.step==='approach')){
       const distance=4.6,theta=yaw.current;
       goal=new THREE.Vector3(current.x+Math.sin(theta)*distance, floorHeight(current.z)+2.65,current.z+Math.cos(theta)*distance);
       look=new THREE.Vector3(current.x,floorHeight(current.z)+1.23,current.z-0.55);
     }else{
       const p=STATIONS[ritual.kind].position;
-      goal=new THREE.Vector3(p[0]+2.15,p[1]+2.15,p[2]+2.7);
-      look=new THREE.Vector3(p[0],p[1]+1.2,p[2]);
+      const focus=ritual.kind==='incense'
+        ? {x:CENSER_POSITION.x,y:1.17,z:CENSER_POSITION.z+(INCENSE_STAND.z-CENSER_POSITION.z)*0.48}
+        : {x:p[0],y:p[1]+1.2,z:p[2]};
+      const orbitGoal=getRitualCameraPosition(focus,ritualOrbit.current);
+      goal=new THREE.Vector3(orbitGoal.x,orbitGoal.y,orbitGoal.z);
+      look=new THREE.Vector3(focus.x,focus.y,focus.z);
     }
     camera.position.lerp(goal,1-Math.exp(-4.5*dt));
     const target=new THREE.Vector3();
@@ -450,7 +549,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     const pos=position.current;
     if(ritual.kind!=='explore')return;
     const st=STATIONS[type];
-    if(Math.hypot(pos.x-st.stand[0],pos.z-st.stand[2])<=st.radius)onInteract(type);
+    // The censer itself can be clicked from a distance. Walk there first.
+    if(type==='incense' || Math.hypot(pos.x-st.stand[0],pos.z-st.stand[2])<=st.radius)onInteract(type);
   };
   return <>
     <color attach="background" args={['#c9d8ce']}/>
@@ -477,7 +577,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
           <Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/>
         }>
           <GLBTraveler url={travelerGlbPath} ritual={ritual} walkingRef={isWalking}
-            actionProgress={actionProgress} incenseReleased={incenseReleased}/>
+            actionProgress={actionProgress} incenseReleased={incenseReleased}
+            incenseCount={incenseCount}/>
         </Suspense>
       </AssetBoundary> : <Traveler ritual={ritual} walkingRef={isWalking}
         actionProgress={actionProgress} incenseReleased={incenseReleased}/>}
