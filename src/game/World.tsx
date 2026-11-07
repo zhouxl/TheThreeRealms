@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -12,6 +12,19 @@ import {
   type IncenseAction,
 } from './incenseMotion.ts';
 import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
+import {normalizePublicGlbPath} from './assets.ts';
+import AssetBoundary from './AssetBoundary.tsx';
+import GLBDeity from './GLBDeity.tsx';
+import GLBTraveler from './GLBTraveler.tsx';
+
+const travelerGlbPath=normalizePublicGlbPath(import.meta.env.VITE_TRAVELER_GLB_URL);
+const deityGlbPath=normalizePublicGlbPath(import.meta.env.VITE_DEITY_GLB_URL);
+if(import.meta.env.VITE_TRAVELER_GLB_URL && !travelerGlbPath) {
+  console.warn('[TheThreeRealms] Ignoring invalid VITE_TRAVELER_GLB_URL; expected /models/name.glb.');
+}
+if(import.meta.env.VITE_DEITY_GLB_URL && !deityGlbPath) {
+  console.warn('[TheThreeRealms] Ignoring invalid VITE_DEITY_GLB_URL; expected /models/name.glb.');
+}
 
 const C = {
   timber: '#76513d', darkTimber: '#49382d', red: '#975346',
@@ -447,12 +460,28 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     <ambientLight intensity={0.38}/>
     <Surroundings/>
     <Hall/>
-    <Deity/>
+    {deityGlbPath ? <AssetBoundary label="Wenchang deity" fallback={<Deity/>}>
+      <Suspense fallback={<Deity/>}>
+        <GLBDeity url={deityGlbPath}/>
+      </Suspense>
+    </AssetBoundary> : <Deity/>}
     <OfferingAltar/>
     <group onClick={()=>handleClick('incense')}><IncenseBurner incenseCount={incenseCount} previewPlaced={incenseReleased && ritual.kind==='incense' && ritual.step==='placing'}/></group>
     <group onClick={()=>handleClick('fortune')}><FortuneTable/></group>
     <group onClick={()=>handleClick('blessing')}><BlessingRack blessings={blessings}/></group>
-    <group ref={player}><Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/></group>
+    <group ref={player}>
+      {travelerGlbPath ? <AssetBoundary label="traveler" fallback={
+        <Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/>
+      }>
+        <Suspense fallback={
+          <Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/>
+        }>
+          <GLBTraveler url={travelerGlbPath} ritual={ritual} walkingRef={isWalking}
+            actionProgress={actionProgress} incenseReleased={incenseReleased}/>
+        </Suspense>
+      </AssetBoundary> : <Traveler ritual={ritual} walkingRef={isWalking}
+        actionProgress={actionProgress} incenseReleased={incenseReleased}/>}
+    </group>
   </>;
 }
 
