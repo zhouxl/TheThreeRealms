@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {easeInOut, INCENSE_RELEASE_PROGRESS} from './incenseMotion.ts';
+import {armCenserClearance,getArmSkeletonPoints} from './incenseCollision.ts';
 
 export type IncensePoint=Readonly<{x:number;y:number;z:number}>;
 const HOVER_OFFSET=0.30;
@@ -99,29 +100,51 @@ export function reachWithArm(
  * The over-the-rim elbow pole is stable across frames, avoiding IK branch flips.
  */
 export function poleElbowAwayFromCenser(
-  shoulder:THREE.Object3D,wrist:THREE.Object3D,grip:THREE.Object3D,
-  target:IncensePoint,progress:number,
-):void {
+  shoulder:THREE.Object3D,elbow:THREE.Object3D,wrist:THREE.Object3D,
+  grip:THREE.Object3D,target:IncensePoint,
+):number {
   const parent=shoulder.parent;
   if(!parent)throw new Error('Shoulder_R must have a parent');
   shoulder.updateWorldMatrix(true,true);
   const origin=shoulder.getWorldPosition(new THREE.Vector3());
   const axis=new THREE.Vector3(target.x-origin.x,target.y-origin.y,target.z-origin.z);
-  if(axis.lengthSq()<1e-8)return;
+  if(axis.lengthSq()<1e-8)return 0;
   axis.normalize();
 
-  const release=INCENSE_RELEASE_PROGRESS;
-  const poleWeight=progress<approachEnd
-    ? easeInOut(progress/approachEnd)
-    : progress<=0.87 ? 1 : 1-easeInOut((progress-0.87)/(1-0.87));
-  const worldDelta=new THREE.Quaternion().setFromAxisAngle(axis,Math.PI*poleWeight);
+  const base=shoulder.quaternion.clone();
   const parentWorld=parent.getWorldQuaternion(new THREE.Quaternion());
-  const localDelta=parentWorld.clone().invert().multiply(worldDelta).multiply(parentWorld);
-  shoulder.quaternion.premultiply(localDelta);
+  const parentInv=parentWorld.clone().invert();
+  const wanted=new THREE.Vector3(target.x,target.y,target.z);
+  // Keeping a consistent set of anatomically reachable elbow-pole candidates
+  // avoids letting the unconstrained CCD cross the metal side wall.
+  const degrees=[60,90,120,30,0,-30,-60,-90,-120,150,-150,180];
+  let bestQ=base.clone();
+  let bestScore=-Infinity,bestClearance=-Infinity;
+  for(const degree of degrees){
+    shoulder.quaternion.copy(base);
+    const worldDelta=new THREE.Quaternion().setFromAxisAngle(axis,degree*Math.PI/180);
+    const localDelta=parentInv.clone().multiply(worldDelta).multiply(parentWorld);
+    shoulder.quaternion.premultiply(localDelta);
+    shoulder.updateWorldMatrix(true,true);
+    aimWristUpright(wrist,grip);
+
+    const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+    const error=grip.getWorldPosition(new THREE.Vector3()).distanceTo(wanted);
+    if(error>0.12)continue; // The hand must still visibly hold the incense at its slot.
+    // Penalize near-intersections heavily, then favour clear, natural elbow arcs.
+    const safe=clearance>=0.006;
+    const score=(safe?100:0)+clearance*5-error*0.5-Math.abs(degree)*0.0007;
+    if(score>bestScore){
+      bestScore=score;
+      bestClearance=clearance;
+      bestQ.copy(shoulder.quaternion);
+    }
+  }
+  shoulder.quaternion.copy(bestQ);
   shoulder.updateWorldMatrix(true,true);
   aimWristUpright(wrist,grip);
+  return bestClearance;
 }
-
 /** Convenience for the actual runtime performer; always leave the prop rooted to the wrist. */
 export function positionIncenseHand(
   shoulder:THREE.Object3D,elbow:THREE.Object3D,wrist:THREE.Object3D,
@@ -131,7 +154,7 @@ export function positionIncenseHand(
   if(step==='placing'){
     const point=sampleOverhandInsertion(start,target,progress);
     reachWithArm(shoulder,elbow,wrist,grip,point);
-    poleElbowAwayFromCenser(shoulder,wrist,grip,point,progress);
+    poleElbowAwayFromCenser(shoulder,elbow,wrist,grip,point);
     return grip.getWorldPosition(new THREE.Vector3()).distanceTo(
       new THREE.Vector3(point.x,point.y,point.z));
   }
