@@ -18,7 +18,7 @@ export const STATIONS: Readonly<Record<Station, { label: string; position: Vec3;
 };
 
 export type PlayerPosition = { x: number; z: number };
-export type IncenseStep = 'take' | 'light' | 'hold' | 'bow' | 'bowing' | 'place' | 'placing' | 'done';
+export type IncenseStep = 'approach' | 'take' | 'light' | 'hold' | 'bow' | 'bowing' | 'place' | 'placing' | 'done';
 export type Ritual =
   | { kind: 'explore' }
   | { kind: 'incense'; step: IncenseStep }
