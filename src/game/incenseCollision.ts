@@ -71,3 +71,48 @@ export function getArmSkeletonPoints(
   shoulder.updateWorldMatrix(true,true);
   return {shoulder:point(shoulder),elbow:point(elbow),wrist:point(wrist)};
 }
+
+/**
+ * Technical low-poly rig safeguard: move the elbow joint up/back over the
+ * censer lip while *counter-translating its child hand*, so the IncenseGrip
+ * and stick stay at the exact reached position. This is a short-lived rig
+ * adjustment until a fully authored IK hand/forearm asset is available.
+ */
+export function liftElbowClearOfCenser(
+  shoulder:THREE.Object3D,elbow:THREE.Object3D,
+  hand:THREE.Object3D,wrist:THREE.Object3D,
+  minClearance=0.008,
+):Readonly<{clearance:number;liftY:number;backZ:number}> {
+  if(!elbow.parent || hand.parent!==elbow){
+    throw new Error('Arm rig requires Elbow_R -> Hand_R parent chain');
+  }
+  const originElbow=elbow.position.clone(),originHand=hand.position.clone();
+  const parentInv=elbow.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const elbowInv=elbow.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const moves:Array<{dy:number;dz:number}>=[];
+  for(const dy of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28,0.32]){
+    for(const dz of [0,0.04,0.08,0.12,0.16,0.20,0.24,0.28]){
+      moves.push({dy,dz});
+    }
+  }
+  moves.sort((a,b)=>
+    a.dy*a.dy+a.dz*a.dz-(b.dy*b.dy+b.dz*b.dz));
+  let best={clearance:-Infinity,liftY:0,backZ:0};
+  for(const move of moves){
+    const offset=new THREE.Vector3(0,move.dy,move.dz);
+    elbow.position.copy(originElbow).add(offset.clone().applyQuaternion(parentInv));
+    hand.position.copy(originHand).sub(offset.clone().applyQuaternion(elbowInv));
+    elbow.updateWorldMatrix(true,true);
+    const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+    if(clearance>best.clearance)best={clearance,liftY:move.dy,backZ:move.dz};
+    if(clearance>=minClearance){
+      return {clearance,liftY:move.dy,backZ:move.dz};
+    }
+  }
+  // Preserve the least-penetrating posture when no exact solution exists.
+  const fallback=new THREE.Vector3(0,best.liftY,best.backZ);
+  elbow.position.copy(originElbow).add(fallback.clone().applyQuaternion(parentInv));
+  hand.position.copy(originHand).sub(fallback.clone().applyQuaternion(elbowInv));
+  elbow.updateWorldMatrix(true,true);
+  return best;
+}
