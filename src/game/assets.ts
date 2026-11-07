@@ -1,6 +1,6 @@
 /** Standalone, testable contract for author-supplied glTF/GLB models. */
 export const TRAVELER_REQUIRED_CLIPS = ['Idle', 'Walk', 'Bow', 'PlaceIncense'] as const;
-export const TRAVELER_REQUIRED_NODES = ['IncenseGrip'] as const;
+export const TRAVELER_REQUIRED_NODES = ['Elbow_R', 'Wrist_R', 'IncenseGrip'] as const;
 export const TRAVELER_OPTIONAL_CLIPS = ['HoldIncense', 'TakeIncense', 'LightIncense'] as const;
 export const TRAVELER_EXPECTED_HEIGHT = 1.55;
 export const TRAVELER_TECH_DEMO_URL = '/models/traveler-tech-demo.glb';

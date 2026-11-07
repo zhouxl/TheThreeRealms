@@ -22,11 +22,11 @@ test('GLB URLs must be safe same-origin public paths', () => {
 
 test('traveler contract lists all missing clips and grip anchors', () => {
   assert.deepEqual(validateTravelerContract(
-    ['Root','Spine','Hand_R','IncenseGrip'],
+    ['Root','Spine','Hand_R','Elbow_R','Wrist_R','IncenseGrip'],
     ['Idle','Walk','Bow','PlaceIncense','TakeIncense'],
   ),{valid:true,missingClips:[],missingNodes:[]});
   assert.deepEqual(validateTravelerContract(['Hand_R'],['Idle','Walk']),{
-    valid:false,missingClips:['Bow','PlaceIncense'],missingNodes:['IncenseGrip'],
+    valid:false,missingClips:['Bow','PlaceIncense'],missingNodes:['Elbow_R','Wrist_R','IncenseGrip'],
   });
 });
 

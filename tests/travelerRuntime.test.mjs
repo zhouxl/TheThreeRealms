@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
-import {alignHeldIncense} from '../src/game/incenseTransforms.ts';
+import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
 import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
 import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
 
@@ -50,43 +50,58 @@ test('Three.js AnimationMixer can sample the GLB bow and insertion clips',async(
   assert.ok(rightArm.rotation.x>0.7,'PlaceIncense should move the joint toward the censer');
 });
 
-test('actual skinned rig keeps incense world-up and releases at near-side ash marker',async()=>{
+test('actual GLB uses wrist joint to orient hand-held incense, without correcting the prop',async()=>{
   const loaded=await loadTraveler();
-  const player=new THREE.Group();
-  player.position.set(INCENSE_STAND.x,0,INCENSE_STAND.z);
-  player.rotation.y=0.35;
-  player.add(loaded.scene);
+  const traveler=new THREE.Group();traveler.position.z=INCENSE_STAND.z;
+  traveler.rotation.y=0.45;traveler.add(loaded.scene);
   const grip=loaded.scene.getObjectByName('IncenseGrip');
-  assert.ok(grip);
-  const prop=new THREE.Group();grip.add(prop);
-
+  const wrist=loaded.scene.getObjectByName('Wrist_R');
+  const stick=new THREE.Group();grip.add(stick);
   const mixer=new THREE.AnimationMixer(loaded.scene);
-  const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
-  const action=mixer.clipAction(clip);
-  action.setLoop(THREE.LoopOnce,1).play();
-  mixer.setTime(clip.duration*INCENSE_RELEASE_PROGRESS);
-
-  alignHeldIncense(grip,prop,'placing',INCENSE_RELEASE_PROGRESS);
-  player.updateMatrixWorld(true);
-  const stickUp=new THREE.Vector3(0,1,0).applyQuaternion(prop.getWorldQuaternion(new THREE.Quaternion()));
-  assert.ok(stickUp.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
-  const base=prop.getWorldPosition(new THREE.Vector3());
-  const ash=new THREE.Vector3(INCENSE_TARGET.x,INCENSE_TARGET.y,INCENSE_TARGET.z);
-  assert.ok(base.distanceTo(ash)<1e-5,'actual GLB reaches the persisted incense slot at release');
+  const clip=loaded.animations.find(c=>c.name==='Bow');
+  mixer.clipAction(clip).play();mixer.setTime(clip.duration*0.5);
+  aimWristUpright(wrist,grip);
+  traveler.updateMatrixWorld(true);
+  const up=new THREE.Vector3(0,1,0).applyQuaternion(grip.getWorldQuaternion(new THREE.Quaternion()));
+  assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-6);
+  assert.ok(stick.quaternion.equals(new THREE.Quaternion()),'incense mesh has no independent counter-rotation');
+  assert.ok(wrist.quaternion.angleTo(new THREE.Quaternion())>0.1,'wrist actually changes orientation');
 });
 
-test('second incense on real GLB moves to second ash slot, while remaining upright',async()=>{
-  const loaded=await loadTraveler();
-  const parent=new THREE.Group();parent.position.z=INCENSE_STAND.z;parent.add(loaded.scene);
-  const grip=loaded.scene.getObjectByName('IncenseGrip');
-  const prop=new THREE.Group();grip.add(prop);
-  const slot=getIncenseInsertionTarget(1);
-  const mixer=new THREE.AnimationMixer(loaded.scene);
-  const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
-  mixer.clipAction(clip).play();
-  mixer.setTime(clip.duration*INCENSE_RELEASE_PROGRESS);
-  alignHeldIncense(grip,prop,'placing',INCENSE_RELEASE_PROGRESS,slot);
-  parent.updateMatrixWorld(true);
-  const at=prop.getWorldPosition(new THREE.Vector3());
-  assert.ok(at.distanceTo(new THREE.Vector3(slot.x,slot.y,slot.z))<1e-6);
-});
+for(const count of [0,1,2]){
+  test(`skinned arm carries incense base above slot then DOWN into ash, slot ${count}`,async()=>{
+    const loaded=await loadTraveler();
+    const player=new THREE.Group();player.position.z=INCENSE_STAND.z;
+    player.add(loaded.scene);
+    const shoulder=loaded.scene.getObjectByName('Shoulder_R');
+    const elbow=loaded.scene.getObjectByName('Elbow_R');
+    const wrist=loaded.scene.getObjectByName('Wrist_R');
+    const grip=loaded.scene.getObjectByName('IncenseGrip');
+    const stick=new THREE.Group();grip.add(stick);
+    const mixer=new THREE.AnimationMixer(loaded.scene);
+    const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
+    mixer.clipAction(clip).play();
+    const slot=getIncenseInsertionTarget(count);
+    mixer.setTime(clip.duration*0.05);
+    player.updateMatrixWorld(true);
+    const start=grip.getWorldPosition(new THREE.Vector3());
+    let points=[];
+    for(const progress of [0.43,0.55,0.65,INCENSE_RELEASE_PROGRESS]){
+      mixer.setTime(clip.duration*progress);
+      // Actual actor takes one short step toward the censer during insertion.
+      loaded.scene.position.z=-0.62;
+      const desired=sampleOverhandInsertion(start,slot,progress);
+      const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
+      player.updateMatrixWorld(true);
+      const actual=grip.getWorldPosition(new THREE.Vector3());
+      assert.ok(error<0.14,`hand must reach ash neighborhood: error=${error} at p=${progress}`);
+      assert.ok(actual.distanceTo(new THREE.Vector3(desired.x,desired.y,desired.z))<0.14);
+      const up=new THREE.Vector3(0,1,0).applyQuaternion(grip.getWorldQuaternion(new THREE.Quaternion()));
+      assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
+      assert.ok(stick.quaternion.equals(new THREE.Quaternion()));
+      points.push(actual.clone());
+    }
+    assert.ok(Math.abs(points[0].z-points[3].z)<0.14,'final section should go down, not across');
+    assert.ok(points[0].y>points[3].y+0.12,'the base of the stick moves down into ash');
+  });
+}
