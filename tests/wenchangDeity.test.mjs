@@ -60,7 +60,10 @@ test('deity sculpture contract contains root, both hands and correct props',()=>
 });
 
 test('committed deity GLB stays at precisely 2.85m from the pedestal floor',()=>{
-  const accessors=json.meshes.flatMap(mesh=>mesh.primitives.map(p=>json.accessors[p.attributes.POSITION]));
+  // The brush and scroll are built in hand-local coordinates and can have
+  // negative local Y values even when they are above the world ground.
+  // Read the root sculpture here; world-space bounds are tested with GLTFLoader.
+  const accessors=json.meshes[0].primitives.map(p=>json.accessors[p.attributes.POSITION]);
   const bottom=Math.min(...accessors.map(a=>a.min[1]));
   const top=Math.max(...accessors.map(a=>a.max[1]));
   assert.ok(Math.abs(bottom)<0.0001,`unexpected ground origin ${bottom}`);
