@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,6 +7,11 @@ import {
   type PlayerPosition, type Ritual, type Station,
 } from './rules.ts';
 import type { BlessingMemory } from './db.ts';
+import {
+  getTravelerPose, hasReleasedIncense, incenseActionProgress, isIncenseActionStep,
+  type IncenseAction,
+} from './incenseMotion.ts';
+import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
 
 const C = {
   timber: '#76513d', darkTimber: '#49382d', red: '#975346',
@@ -147,14 +152,40 @@ function Smoke({position, particleRadius = 0.17, riseHeight = 1.65, drift = 0.12
     </mesh>)}
   </group>;
 }
-function IncenseBurner({ lit }: {lit: boolean}) {
-  return <group position={[0,0,3.2]}>
-    <mesh position={[0,0.61,0]} castShadow><cylinderGeometry args={[0.57,0.39,0.85,16]}/><meshStandardMaterial color={C.bronze} metalness={0.46} roughness={0.55}/></mesh>
-    <mesh position={[0,1.08,0]} rotation={[Math.PI/2,0,0]}><torusGeometry args={[0.57,0.065,8,20]}/><meshStandardMaterial color={C.gold} metalness={0.5} roughness={0.45}/></mesh>
-    {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}><cylinderGeometry args={[0.14,0.18,0.4,8]}/><meshStandardMaterial color={C.bronze} metalness={0.4}/></mesh>)}
-    {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}><torusGeometry args={[0.2,0.047,8,12]}/><meshStandardMaterial color={C.gold} metalness={0.6}/></mesh>)}
-    {[-0.17,0,0.17].map((x,i)=><mesh key={i} position={[x,1.20,0]}><cylinderGeometry args={[0.014,0.014,0.4,6]}/><meshStandardMaterial color={lit?'#bb5b35':'#b9a884'}/></mesh>)}
-    {lit && <Smoke position={[0,1.45,0]}/>} 
+function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;previewPlaced:boolean}) {
+  const visibleSticks=getVisibleIncenseSlots(incenseCount,previewPlaced);
+  const smokeStick=visibleSticks[visibleSticks.length-1];
+  return <group position={[CENSER_POSITION.x,0,CENSER_POSITION.z]}>
+    <mesh position={[0,0.61,0]} castShadow>
+      <cylinderGeometry args={[0.57,0.39,0.85,16]}/>
+      <meshStandardMaterial color={C.bronze} metalness={0.46} roughness={0.55}/>
+    </mesh>
+    <mesh position={[0,1.08,0]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[0.57,0.065,8,20]}/>
+      <meshStandardMaterial color={C.gold} metalness={0.5} roughness={0.45}/>
+    </mesh>
+    {[-0.3,0.3].map(x=><mesh key={x} position={[x,0.21,0]}>
+      <cylinderGeometry args={[0.14,0.18,0.4,8]}/>
+      <meshStandardMaterial color={C.bronze} metalness={0.4}/>
+    </mesh>)}
+    {[-0.38,0.38].map(x=><mesh key={x} position={[x,0.9,0]} rotation={[0,0,x<0?-0.45:0.45]}>
+      <torusGeometry args={[0.2,0.047,8,12]}/>
+      <meshStandardMaterial color={C.gold} metalness={0.6}/>
+    </mesh>)}
+    {/* Only committed sticks, plus a released-but-not-yet-committed preview,
+        occupy slots. Do not permanently render fake sticks in an empty censer. */}
+    {visibleSticks.map(([x,z],i)=><group key={i} position={[x,0,z]}>
+      <mesh position={[0,1.20,0]} castShadow>
+        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
+        <meshStandardMaterial color="#af8457" roughness={0.95}/>
+      </mesh>
+      <mesh position={[0,1.405,0]}>
+        <sphereGeometry args={[0.022,8,8]}/>
+        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
+      </mesh>
+    </group>)}
+    {smokeStick && <Smoke position={[smokeStick[0],1.43,smokeStick[1]]}
+      particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
   </group>;
 }
 function FortuneTable() {
@@ -188,37 +219,101 @@ function BlessingRack({blessings}: {blessings: BlessingMemory[]}) {
     <Html position={[0,2.13,0]} center distanceFactor={11}><div className="world-object-label">留福</div></Html>
   </group>;
 }
-function Traveler({ ritual, walking }: {ritual:Ritual; walking:boolean}) {
-  const armPose = ritual.kind==='incense' && ritual.step !== 'done';
-  const burningInHand = isHandheldIncenseLit(ritual);
-  const fortunePose = ritual.kind==='fortune';
+/**
+ * Procedural articulated fallback rig for V1.2.
+ * Real skeletal GLB clips will reuse this animation timing and release contract.
+ */
+function Traveler({
+  ritual, walkingRef, actionProgress, incenseReleased,
+}: {
+  ritual: Ritual;
+  walkingRef: MutableRefObject<boolean>;
+  actionProgress: MutableRefObject<number>;
+  incenseReleased: boolean;
+}) {
+  const upper = useRef<THREE.Group>(null);
+  const leftArm = useRef<THREE.Group>(null);
+  const rightArm = useRef<THREE.Group>(null);
+  const incenseGrip = useRef<THREE.Group>(null);
+  const smokeUpright = useRef<THREE.Group>(null);
+  const walkRing = useRef<THREE.Mesh>(null);
+  const step = ritual.kind === 'incense' ? ritual.step : null;
+  const equipped = step !== null && step !== 'done' && !incenseReleased;
+  const lit = isHandheldIncenseLit(ritual) && !incenseReleased;
+
+  useFrame((_, dt) => {
+    const pose = getTravelerPose(step, actionProgress.current);
+    const alpha = 1 - Math.exp(-12 * Math.min(dt, 0.05));
+    if (upper.current) upper.current.rotation.x = THREE.MathUtils.lerp(upper.current.rotation.x, pose.torsoPitch, alpha);
+    const armsTarget = ritual.kind === 'fortune' ? 0.38 : pose.armsForward;
+    for (const arm of [leftArm.current, rightArm.current]) {
+      if (arm) arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, armsTarget, alpha);
+    }
+    if (incenseGrip.current) {
+      incenseGrip.current.position.y = THREE.MathUtils.lerp(incenseGrip.current.position.y, pose.handY, alpha);
+      incenseGrip.current.position.z = THREE.MathUtils.lerp(incenseGrip.current.position.z, pose.handZ, alpha);
+      incenseGrip.current.rotation.x = THREE.MathUtils.lerp(incenseGrip.current.rotation.x, pose.incenseTilt, alpha);
+    }
+    if (smokeUpright.current && upper.current && incenseGrip.current) {
+      // Cancel parent tilt so smoke still rises upward during the bow.
+      smokeUpright.current.rotation.x = -(upper.current.rotation.x + incenseGrip.current.rotation.x);
+    }
+    if (walkRing.current) walkRing.current.visible = walkingRef.current;
+  });
+
   return <group>
-    <mesh position={[0,0.77,0]} castShadow><cylinderGeometry args={[0.23,0.29,0.65,10]}/><meshStandardMaterial color="#e8d8bc" roughness={0.95}/></mesh>
-    {[-0.14,0.14].map(x=><mesh key={`leg-${x}`} position={[x,0.27,0.01]} castShadow><cylinderGeometry args={[0.11,0.12,0.55,8]}/><meshStandardMaterial color="#7b8478"/></mesh>)}
-    {[-0.14,0.14].map(x=><mesh key={`shoe-${x}`} position={[x,0.08,-0.1]} castShadow><boxGeometry args={[0.22,0.15,0.34]}/><meshStandardMaterial color="#7c6756"/></mesh>)}
-    <mesh position={[0,1.22,0]} castShadow><sphereGeometry args={[0.28,16,14]}/><meshStandardMaterial color="#e9bf9c" roughness={0.96}/></mesh>
-    <mesh position={[0,1.39,0.02]} castShadow><sphereGeometry args={[0.285,12,10,0,Math.PI*2,0,1.35]}/><meshStandardMaterial color="#41302a"/></mesh>
-    <mesh position={[0,1.57,0.12]} castShadow><sphereGeometry args={[0.115,8,8]}/><meshStandardMaterial color="#45332b"/></mesh>
-    {[-0.1,0.1].map(x=><mesh key={`eye-${x}`} position={[x,1.25,-0.248]}><sphereGeometry args={[0.02,6,6]}/><meshBasicMaterial color="#342c26"/></mesh>)}
-    {[-0.34,0.34].map((x,i)=><mesh key={`arm-${i}`} position={[x,armPose?0.99:0.91,-0.08]} rotation={[armPose?-0.75:fortunePose?-0.3:0,0,i===0?0.15:-0.15]} castShadow>
-      <cylinderGeometry args={[0.09,0.11,0.54,8]}/><meshStandardMaterial color="#e3d1b4" roughness={0.98}/>
+    {[-0.14,0.14].map(x=><mesh key={`leg-${x}`} position={[x,0.27,0.01]} castShadow>
+      <cylinderGeometry args={[0.11,0.12,0.55,8]}/><meshStandardMaterial color="#7b8478"/>
     </mesh>)}
-    <Block position={[0,0.59,-0.015]} size={[0.56,0.07,0.37]} color="#936d52"/>
-    <Block position={[0.28,0.6,0.19]} size={[0.29,0.34,0.18]} color="#a7825f"/>
-    {armPose && <mesh position={[0,1.03,-0.43]}>
-      <cylinderGeometry args={[0.012,0.012,0.48,5]}/>
-      <meshStandardMaterial color="#ad8d54"/>
-    </mesh>}
-    {burningInHand && <>
-      <mesh position={[0,1.275,-0.43]}>
-        <sphereGeometry args={[0.027,8,8]}/>
-        <meshStandardMaterial color="#d87549" emissive="#fa6e38" emissiveIntensity={1.25}/>
+    {[-0.14,0.14].map(x=><mesh key={`shoe-${x}`} position={[x,0.08,-0.1]} castShadow>
+      <boxGeometry args={[0.22,0.15,0.34]}/><meshStandardMaterial color="#7c6756"/>
+    </mesh>)}
+    {/* The torso pivots around the waist: bend and reach remain independent of the legs. */}
+    <group ref={upper} position={[0,0.7,0]}>
+      <mesh position={[0,0.07,0]} castShadow>
+        <cylinderGeometry args={[0.23,0.29,0.65,10]}/><meshStandardMaterial color="#e8d8bc" roughness={0.95}/>
       </mesh>
-      {/* Smoke is parented to the traveler, so the plume follows the incense tip
-          while the character walks/turns or performs the ritual. */}
-      <Smoke position={[0,1.30,-0.43]} particleRadius={0.055} riseHeight={0.55} drift={0.042} color="#b5b2aa"/>
-    </>}
-    {walking && <mesh position={[0,0.04,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[0.35,0.41,24]}/><meshBasicMaterial color="#d8b475" transparent opacity={0.27} side={THREE.DoubleSide}/></mesh>}
+      <mesh position={[0,0.52,0]} castShadow>
+        <sphereGeometry args={[0.28,16,14]}/><meshStandardMaterial color="#e9bf9c" roughness={0.96}/>
+      </mesh>
+      <mesh position={[0,0.69,0.02]} castShadow>
+        <sphereGeometry args={[0.285,12,10,0,Math.PI*2,0,1.35]}/><meshStandardMaterial color="#41302a"/>
+      </mesh>
+      <mesh position={[0,0.87,0.12]} castShadow>
+        <sphereGeometry args={[0.115,8,8]}/><meshStandardMaterial color="#45332b"/>
+      </mesh>
+      {[-0.1,0.1].map(x=><mesh key={`eye-${x}`} position={[x,0.55,-0.248]}>
+        <sphereGeometry args={[0.02,6,6]}/><meshBasicMaterial color="#342c26"/>
+      </mesh>)}
+      <group ref={leftArm} position={[-0.34,0.29,-0.08]}>
+        <mesh position={[0,-0.25,0]} castShadow><cylinderGeometry args={[0.09,0.11,0.5,8]}/><meshStandardMaterial color="#e3d1b4"/></mesh>
+        <mesh position={[0,-0.50,0]}><sphereGeometry args={[0.10,8,8]}/><meshStandardMaterial color="#e9bf9c"/></mesh>
+      </group>
+      <group ref={rightArm} position={[0.34,0.29,-0.08]}>
+        <mesh position={[0,-0.25,0]} castShadow><cylinderGeometry args={[0.09,0.11,0.5,8]}/><meshStandardMaterial color="#e3d1b4"/></mesh>
+        <mesh position={[0,-0.50,0]}><sphereGeometry args={[0.10,8,8]}/><meshStandardMaterial color="#e9bf9c"/></mesh>
+      </group>
+      <Block position={[0,-0.11,-0.015]} size={[0.56,0.07,0.37]} color="#936d52"/>
+      <Block position={[0.28,-0.1,0.19]} size={[0.29,0.34,0.18]} color="#a7825f"/>
+      <group ref={incenseGrip} position={[0,0.28,-0.43]}>
+        {equipped && <mesh position={[0,0.24,0]}>
+          <cylinderGeometry args={[0.012,0.012,0.48,6]}/><meshStandardMaterial color="#ad8d54"/>
+        </mesh>}
+        {lit && <>
+          <mesh position={[0,0.48,0]}>
+            <sphereGeometry args={[0.027,8,8]}/>
+            <meshStandardMaterial color="#d87549" emissive="#fa6e38" emissiveIntensity={1.25}/>
+          </mesh>
+          <group ref={smokeUpright} position={[0,0.49,0]}>
+            <Smoke position={[0,0,0]} particleRadius={0.055} riseHeight={0.55} drift={0.042} color="#b5b2aa"/>
+          </group>
+        </>}
+      </group>
+    </group>
+    <mesh ref={walkRing} position={[0,0.04,0]} rotation={[-Math.PI/2,0,0]}>
+      <ringGeometry args={[0.35,0.41,24]}/>
+      <meshBasicMaterial color="#d8b475" transparent opacity={0.27} side={THREE.DoubleSide}/>
+    </mesh>
   </group>;
 }
 
@@ -229,20 +324,45 @@ export type WorldProps = {
   ritual: Ritual;
   blessings: BlessingMemory[];
   incenseCount: number;
+  onIncenseActionComplete: (action:IncenseAction)=>void;
   onNearby: (station:Station|null)=>void;
   onInteract: (station:Station)=>void;
   ready: boolean;
 };
 
-function GameWorld({input,ritual,blessings,incenseCount,onNearby,onInteract,ready}:WorldProps){
+function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onNearby,onInteract,ready}:WorldProps){
   const player=useRef<THREE.Group>(null);
   const position=useRef<PlayerPosition>({x:0,z:6.1});
   const yaw=useRef(0);
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
+  const actionProgress=useRef(0);
+  const actionElapsed=useRef(0);
+  const actionStep=useRef<IncenseAction|null>(null);
+  const actionFinished=useRef(false);
+  const incenseReleaseRef=useRef(false);
+  const [incenseReleased,setIncenseReleased]=useState(false);
+  const actionCallbackRef=useRef(onIncenseActionComplete);
+  actionCallbackRef.current=onIncenseActionComplete;
   const {camera,gl}=useThree();
   const onNearbyRef=useRef(onNearby);
   onNearbyRef.current=onNearby;
+
+  useEffect(()=>{
+    if(ritual.kind==='incense') {
+      // Temporary cinematically aligned position close enough for the hand to reach the censer.
+      // Replace the short snap with a walk-up clip once authored assets are available.
+      position.current={x:INCENSE_STAND.x,z:INCENSE_STAND.z};
+      if(player.current) player.current.rotation.y=0;
+    }
+  },[ritual.kind]);
+
+  useEffect(()=>{
+    if(ritual.kind!=='incense' || ritual.step!=='placing'){
+      incenseReleaseRef.current=false;
+      setIncenseReleased(false);
+    }
+  },[ritual]);
 
   useEffect(()=>{
     let active=false,lastX=0;
@@ -256,6 +376,25 @@ function GameWorld({input,ritual,blessings,incenseCount,onNearby,onInteract,read
     return ()=>{dom.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
   },[gl,ritual.kind]);
   useFrame((state,dt)=>{
+    const currentAction=ritual.kind==='incense' && isIncenseActionStep(ritual.step) ? ritual.step : null;
+    if(currentAction!==actionStep.current){
+      actionStep.current=currentAction;
+      actionElapsed.current=0;
+      actionProgress.current=0;
+      actionFinished.current=false;
+    }
+    if(currentAction && !actionFinished.current){
+      actionElapsed.current+=Math.min(dt,0.05);
+      actionProgress.current=incenseActionProgress(currentAction,actionElapsed.current);
+      if(!incenseReleaseRef.current && hasReleasedIncense(currentAction,actionProgress.current)){
+        incenseReleaseRef.current=true;
+        setIncenseReleased(true);
+      }
+      if(actionProgress.current>=1){
+        actionFinished.current=true;
+        actionCallbackRef.current(currentAction);
+      }
+    }
     const pos=position.current;
     if (ritual.kind==='explore' && ready){
       const keys=input.current;
@@ -310,10 +449,10 @@ function GameWorld({input,ritual,blessings,incenseCount,onNearby,onInteract,read
     <Hall/>
     <Deity/>
     <OfferingAltar/>
-    <group onClick={()=>handleClick('incense')}><IncenseBurner lit={incenseCount>0}/></group>
+    <group onClick={()=>handleClick('incense')}><IncenseBurner incenseCount={incenseCount} previewPlaced={incenseReleased && ritual.kind==='incense' && ritual.step==='placing'}/></group>
     <group onClick={()=>handleClick('fortune')}><FortuneTable/></group>
     <group onClick={()=>handleClick('blessing')}><BlessingRack blessings={blessings}/></group>
-    <group ref={player}><Traveler ritual={ritual} walking={isWalking.current}/></group>
+    <group ref={player}><Traveler ritual={ritual} walkingRef={isWalking} actionProgress={actionProgress} incenseReleased={incenseReleased}/></group>
   </>;
 }
 

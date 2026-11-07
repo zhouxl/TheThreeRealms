@@ -34,7 +34,7 @@ test('held incense smoke starts after ignition and stops when placed or cancelle
   for (const step of ['take','light','done']) {
     assert.equal(isHandheldIncenseLit({kind:'incense',step}), false, step);
   }
-  for (const step of ['hold','bow','place']) {
+  for (const step of ['hold','bow','bowing','place','placing']) {
     assert.equal(isHandheldIncenseLit({kind:'incense',step}), true, step);
   }
   assert.equal(isHandheldIncenseLit({kind:'explore'}), false);
