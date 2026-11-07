@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import World, { type Direction, type InputRef } from './game/World.tsx';
 import { firstAvailableSlot, getNearestStation, INCENSE_STEPS, nextIncenseStep, normalizeWish, pickFortune, STATIONS, type Ritual, type Station } from './game/rules.ts';
-import { addBlessingMemory, addFortuneMemory, addIncenseMemory, clearMemories, deleteBlessingMemory, loadMemories, type Memories } from './game/db.ts';
+import { addBlessingMemory, addFortuneMemory, addIncenseMemory, clearMemories, describeStorageError, deleteBlessingMemory, loadMemories, type Memories } from './game/db.ts';
 import { getFortune } from './game/fortuneData.ts';
 
 const INIT_MEMORIES: Memories = {incense:[],fortunes:[],blessings:[]};
@@ -44,8 +44,9 @@ export default function App(){
 
   useEffect(()=>{
     let alive=true;
-    loadMemories().then(data=>{if(alive)setMemories(data);}).catch(()=>{
-      if(alive)setError('浏览器无法读取本地纪念，仍可继续探索；私密记录暂时无法保存。');
+    loadMemories().then(data=>{if(alive)setMemories(data);}).catch(error=>{
+      console.error('读取本地纪念失败', error);
+      if(alive)setError(`浏览器无法读取本地纪念：${describeStorageError(error)}`);
     });
     return ()=>{alive=false;};
   },[]);
@@ -87,7 +88,11 @@ export default function App(){
       const memory=await addIncenseMemory();
       setMemories(prev=>({...prev,incense:[...prev.incense,memory]}));
       setRitual({kind:'incense',step:'done'});
-    }catch{setError('上香动画已完成，但本地纪念保存失败，请检查浏览器存储权限。');setRitual({kind:'incense',step:'done'});}
+    }catch(error){
+      console.error('上香纪念保存失败', error);
+      setError(`上香纪念尚未保存：${describeStorageError(error)} 可再次点击「插香 · 完成」重试。`);
+      // Keep the 'place' step until the IndexedDB transaction commits.
+    }
     finally{setBusy(false);}
   };
   const drawFortune=async()=>{
@@ -97,7 +102,10 @@ export default function App(){
     try{
       const memory=await addFortuneMemory(n);
       setMemories(prev=>({...prev,fortunes:[...prev.fortunes,memory]}));
-    }catch{setError('签号已揭晓，但历史记录无法保存。');}
+    }catch(error){
+      console.error('签文历史保存失败', error);
+      setError(`签号已揭晓但历史尚未保存：${describeStorageError(error)}`);
+    }
     finally{setBusy(false);setRitual({kind:'fortune',step:'reading',number:n});}
   };
   const hangBlessing=async()=>{
@@ -111,7 +119,10 @@ export default function App(){
       const record=await addBlessingMemory(clean,template,slot);
       setMemories(prev=>({...prev,blessings:[...prev.blessings,record]}));
       setRitual({kind:'blessing',step:'done',slotId:slot});
-    }catch{setError('本地保存失败，请检查浏览器存储权限后重试。');}
+    }catch(error){
+      console.error('福牌保存失败', error);
+      setError(`福牌未保存：${describeStorageError(error)}`);
+    }
     finally{setBusy(false);}
   };
   const removeBlessing=async(id:string)=>{

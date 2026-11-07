@@ -1,3 +1,5 @@
+import { createLocalId } from './id.ts';
+
 /** All user-written wishes remain in this browser's IndexedDB. No network writes. */
 export type IncenseMemory = { id: string; createdAt: string };
 export type FortuneMemory = { id: string; number: number; createdAt: string };
@@ -26,13 +28,19 @@ function openDatabase(): Promise<IDBDatabase> {
 async function runStore<T>(name: Store, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
   const db = await openDatabase();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(name, mode);
-    const request = action(transaction.objectStore(name));
-    let result: T;
-    request.onsuccess = () => { result = request.result; };
-    transaction.oncomplete = () => { db.close(); resolve(result); };
-    transaction.onabort = () => { db.close(); reject(transaction.error ?? new Error('本地保存失败')); };
-    transaction.onerror = () => { /* onabort owns the rejection */ };
+    try {
+      const transaction = db.transaction(name, mode);
+      const request = action(transaction.objectStore(name));
+      let result: T;
+      request.onsuccess = () => { result = request.result; };
+      transaction.oncomplete = () => { db.close(); resolve(result); };
+      transaction.onabort = () => { db.close(); reject(transaction.error ?? new Error('本地保存失败')); };
+      transaction.onerror = () => { /* onabort owns the rejection */ };
+    } catch (error) {
+      // Opening a transaction or object store can throw synchronously.
+      db.close();
+      reject(error);
+    }
   });
 }
 
@@ -46,19 +54,19 @@ export async function loadMemories(): Promise<Memories> {
 }
 
 export async function addIncenseMemory(): Promise<IncenseMemory> {
-  const memory: IncenseMemory = { id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+  const memory: IncenseMemory = { id: createLocalId(), createdAt: new Date().toISOString() };
   await runStore('incense', 'readwrite', store => store.add(memory));
   return memory;
 }
 
 export async function addFortuneMemory(number: number): Promise<FortuneMemory> {
-  const memory: FortuneMemory = { id: crypto.randomUUID(), number, createdAt: new Date().toISOString() };
+  const memory: FortuneMemory = { id: createLocalId(), number, createdAt: new Date().toISOString() };
   await runStore('fortunes', 'readwrite', store => store.add(memory));
   return memory;
 }
 
 export async function addBlessingMemory(content: string, template: number, slot: number): Promise<BlessingMemory> {
-  const memory: BlessingMemory = { id: crypto.randomUUID(), content, template, slot, createdAt: new Date().toISOString() };
+  const memory: BlessingMemory = { id: createLocalId(), content, template, slot, createdAt: new Date().toISOString() };
   await runStore('blessings', 'readwrite', store => store.add(memory));
   return memory;
 }
@@ -76,4 +84,21 @@ export async function clearMemories(): Promise<Memories> {
     tx.onabort = () => { db.close(); reject(tx.error ?? new Error('清除失败')); };
   });
   return { ...EMPTY, incense: [], fortunes: [], blessings: [] };
+}
+
+/** User-safe storage error message; don't misreport every error as permissions. */
+export function describeStorageError(error: unknown): string {
+  const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
+  switch (name) {
+    case 'QuotaExceededError':
+      return '浏览器分配给本站的存储空间已满，请清理空间后重试。';
+    case 'SecurityError':
+    case 'NotAllowedError':
+      return '浏览器禁止本站使用本地存储，请检查隐私设置或尝试普通浏览窗口。';
+    case 'InvalidStateError':
+    case 'VersionError':
+      return '本地数据库状态异常，请刷新页面后重试。';
+    default:
+      return '本地数据库写入失败；请重试，并在开发者控制台查看具体错误。';
+  }
 }
