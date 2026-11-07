@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INCENSE_ACTION_SECONDS, INCENSE_RELEASE_PROGRESS, advanceIncenseButton, incenseActionProgress,
+  sampleIncenseClipProgress, getIncenseReachWeight,
   getTravelerPose, hasReleasedIncense, isIncenseActionStep,
 } from '../src/game/incenseMotion.ts';
 import {
@@ -91,4 +92,20 @@ test('the incense base is aligned with the ash at the insertion release marker',
   assert.ok(Math.abs(release.x-INCENSE_TARGET.x)<0.01);
   assert.ok(Math.abs(release.y-INCENSE_TARGET.y)<0.12);
   assert.ok(Math.abs(release.z-INCENSE_TARGET.z)<0.15);
+});
+
+test('GLB bow eases down, pauses briefly, then returns upright',()=>{
+  assert.equal(sampleIncenseClipProgress('bowing',0),0);
+  assert.ok(Math.abs(sampleIncenseClipProgress('bowing',0.50)-0.5)<1e-8);
+  assert.ok(Math.abs(sampleIncenseClipProgress('bowing',0.60)-0.5)<1e-8);
+  assert.equal(sampleIncenseClipProgress('bowing',1),1);
+});
+
+test('GLB insertion reaches the same release marker as the saving event',()=>{
+  assert.equal(sampleIncenseClipProgress('placing',0),0);
+  assert.ok(Math.abs(sampleIncenseClipProgress('placing',INCENSE_RELEASE_PROGRESS)-INCENSE_RELEASE_PROGRESS)<1e-8);
+  assert.equal(sampleIncenseClipProgress('placing',1),1);
+  assert.ok(sampleIncenseClipProgress('placing',0.2)<0.2,'slower preparation before reaching');
+  assert.ok(getIncenseReachWeight(0.5)>0.25);
+  assert.equal(getIncenseReachWeight(1),0);
 });

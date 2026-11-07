@@ -62,6 +62,28 @@ export function incenseActionProgress(action: IncenseAction, elapsedSeconds: num
   return clamp01(elapsedSeconds / INCENSE_ACTION_SECONDS[action]);
 }
 
+/** A composed bow with a short, quiet hold near its lowest point. */
+export function sampleIncenseClipProgress(action:IncenseAction,progress:number):number{
+  const p=clamp01(progress);
+  if(action==='bowing'){
+    if(p<=0.42)return 0.5*easeInOut(p/0.42);
+    if(p<=0.62)return 0.5;
+    return 0.5+0.5*easeInOut((p-0.62)/0.38);
+  }
+  return p<=INCENSE_RELEASE_PROGRESS
+    ? INCENSE_RELEASE_PROGRESS*easeInOut(p/INCENSE_RELEASE_PROGRESS)
+    : INCENSE_RELEASE_PROGRESS+(1-INCENSE_RELEASE_PROGRESS)*
+      easeInOut((p-INCENSE_RELEASE_PROGRESS)/(1-INCENSE_RELEASE_PROGRESS));
+}
+
+/** Subtle approach during insertion; restore the default stand after release. */
+export function getIncenseReachWeight(progress:number):number{
+  const p=clamp01(progress);
+  const advance=easeInOut(p/INCENSE_RELEASE_PROGRESS);
+  const recover=easeInOut((p-0.79)/(1-0.79));
+  return advance*(1-recover);
+}
+
 export function hasReleasedIncense(step: IncenseStep, progress: number): boolean {
   return step === 'placing' && progress >= INCENSE_RELEASE_PROGRESS;
 }

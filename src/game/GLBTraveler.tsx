@@ -6,7 +6,8 @@ import {clone as cloneSkeleton} from 'three/examples/jsm/utils/SkeletonUtils.js'
 import {
   TRAVELER_EXPECTED_HEIGHT, evaluateModelHeight, selectTravelerClip, validateTravelerContract,
 } from './assets.ts';
-import {clamp01} from './incenseMotion.ts';
+import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
+import {alignHeldIncense} from './incenseTransforms.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
 
 type Props = {
@@ -42,8 +43,7 @@ export default function GLBTraveler({
     return result;
   },[gltf.animations,mixer]);
   const active=useRef<ActionState>({name:null});
-  const smokeRef=useRef<THREE.Group>(null);
-  const smokeRotation=useMemo(()=>new THREE.Quaternion(),[]);
+  const heldUprightRef=useRef<THREE.Group>(null);
 
   useEffect(()=>{
     model.traverse(node=>{
@@ -89,14 +89,22 @@ export default function GLBTraveler({
       // Clip duration can differ from procedural prototype duration.
       // Re-evaluate at the same normalized timestamp as the game event marker.
       const duration=action.getClip().duration;
-      action.time=Math.min(Math.max(0,duration-0.00001),clamp01(actionProgress.current)*duration);
+      action.time=Math.min(
+        Math.max(0,duration-0.00001),
+        sampleIncenseClipProgress(name==='Bow'?'bowing':'placing',clamp01(actionProgress.current))*duration,
+      );
       mixer.update(0);
     }
 
-    if(grip && smokeRef.current){
-      // Keep smoke world-up even when the wrist bends/rotates.
-      grip.getWorldQuaternion(smokeRotation);
-      smokeRef.current.quaternion.copy(smokeRotation).invert();
+    // A subtle eased approach makes the existing low-poly motion less robotic.
+    // This is not IK; the technical asset still needs full rigged hand animation.
+    model.position.z=incenseStep==='placing'
+      ? -0.10*getIncenseReachWeight(actionProgress.current)
+      : 0;
+
+    if(grip && heldUprightRef.current){
+      // Correct the whole stick and its smoke, not only the smoke transform.
+      alignHeldIncense(grip,heldUprightRef.current,incenseStep,actionProgress.current);
     }
   });
 
@@ -109,7 +117,7 @@ export default function GLBTraveler({
   return <>
     <primitive object={model}/>
     {equipped && createPortal(
-      <group>
+      <group ref={heldUprightRef}>
         <mesh position={[0,0.24,0]} castShadow>
           <cylinderGeometry args={[0.012,0.012,0.48,6]}/>
           <meshStandardMaterial color="#ad8d54"/>
@@ -119,7 +127,7 @@ export default function GLBTraveler({
             <sphereGeometry args={[0.027,8,8]}/>
             <meshStandardMaterial color="#d87549" emissive="#fa6e38" emissiveIntensity={1.25}/>
           </mesh>
-          <group ref={smokeRef} position={[0,0.49,0]}>
+          <group position={[0,0.49,0]}>
             <TravelerSmoke/>
           </group>
         </>}
