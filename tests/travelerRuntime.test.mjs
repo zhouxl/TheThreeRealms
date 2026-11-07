@@ -6,6 +6,7 @@ import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
 import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
 import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
+import {armCenserClearance,getArmSkeletonPoints} from '../src/game/incenseCollision.ts';
 
 const binary=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
 const bytes=binary.buffer.slice(binary.byteOffset,binary.byteOffset+binary.byteLength);
@@ -97,6 +98,12 @@ for(const count of [0,1,2,3,4,5]){
       const actual=grip.getWorldPosition(new THREE.Vector3());
       assert.ok(error<0.14,`hand must reach ash neighborhood: error=${error} at p=${progress}`);
       assert.ok(actual.distanceTo(new THREE.Vector3(desired.x,desired.y,desired.z))<0.14);
+      const clearance=armCenserClearance(getArmSkeletonPoints(shoulder,elbow,wrist));
+      if(clearance < 0.006) console.log('CENSER_CLEARANCE_DEBUG',JSON.stringify({
+        slot:count,progress,clearance,
+        skeleton:getArmSkeletonPoints(shoulder,elbow,wrist),
+      }));
+      assert.ok(clearance >= 0.006,`arm must clear censer rim/body: ${clearance} at ${count}/${progress}`);
       const up=new THREE.Vector3(0,1,0).applyQuaternion(grip.getWorldQuaternion(new THREE.Quaternion()));
       assert.ok(up.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
       assert.ok(stick.quaternion.equals(new THREE.Quaternion()));
