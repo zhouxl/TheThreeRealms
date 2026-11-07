@@ -130,7 +130,9 @@ export default function GLBTraveler({
     if(elbow && elbowRest)elbow.position.copy(elbowRest);
     if(hand && handRest)hand.position.copy(handRest);
 
-    if(grip && wrist && equipped){
+    if(grip && wrist){
+      // Keep the empty hand on its collision-safe upward withdrawal path
+      // after the stick has been released into the censer.
       if(placing && shoulder && elbow && insertionStart.current){
         positionIncenseHand(
           shoulder,elbow,wrist,grip,'placing',actionProgress.current,
