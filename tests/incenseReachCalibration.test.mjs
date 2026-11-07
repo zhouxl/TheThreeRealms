@@ -105,4 +105,5 @@ test('diagnostic sweep: can twisting the elbow around the reach axis clear the r
   }
   candidates.sort((a,b)=>b.c-a.c);
   console.log('ARM_SWIVEL_SWEEP',JSON.stringify(candidates.filter(x=>x.err<0.14).slice(0,20)));
+  console.log('ARM_SWIVEL_RELEASE',JSON.stringify(candidates.filter(x=>x.p===0.76 && x.err<0.14).slice(0,30)));
 });
