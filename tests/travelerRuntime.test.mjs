@@ -6,7 +6,7 @@ import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {aimWristUpright,positionIncenseHand,sampleOverhandInsertion} from '../src/game/incenseTransforms.ts';
 import {INCENSE_TARGET, INCENSE_STAND, getIncenseInsertionTarget} from '../src/game/incensePlacement.ts';
 import {INCENSE_RELEASE_PROGRESS,getIncenseReachWeight,sampleIncenseClipProgress} from '../src/game/incenseMotion.ts';
-import {armCenserClearance,getArmSkeletonPoints} from '../src/game/incenseCollision.ts';
+import {armCenserClearance,getArmSkeletonPoints,liftElbowClearOfCenser} from '../src/game/incenseCollision.ts';
 
 const binary=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
 const bytes=binary.buffer.slice(binary.byteOffset,binary.byteOffset+binary.byteLength);
@@ -77,6 +77,8 @@ for(const count of [0,1,2,3,4,5]){
     const shoulder=loaded.scene.getObjectByName('Shoulder_R');
     const elbow=loaded.scene.getObjectByName('Elbow_R');
     const wrist=loaded.scene.getObjectByName('Wrist_R');
+    const hand=loaded.scene.getObjectByName('Hand_R');
+    const elbowRest=elbow.position.clone(),handRest=hand.position.clone();
     const grip=loaded.scene.getObjectByName('IncenseGrip');
     const stick=new THREE.Group();grip.add(stick);
     const mixer=new THREE.AnimationMixer(loaded.scene);
@@ -95,9 +97,17 @@ for(const count of [0,1,2,3,4,5]){
       loaded.scene.position.z=-0.62*weight;
       loaded.scene.position.x=(slot.x-0.28)*weight;
       shoulder.position.y=0.21+0.34*weight;
+      elbow.position.copy(elbowRest);
+      hand.position.copy(handRest);
       const desired=sampleOverhandInsertion(start,slot,progress);
-      const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
+      positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
+      const gripBefore=grip.getWorldPosition(new THREE.Vector3()).clone();
+      liftElbowClearOfCenser(shoulder,elbow,hand,wrist);
       player.updateMatrixWorld(true);
+      const error=grip.getWorldPosition(new THREE.Vector3()).distanceTo(
+        new THREE.Vector3(desired.x,desired.y,desired.z));
+      assert.ok(grip.getWorldPosition(new THREE.Vector3()).distanceTo(gripBefore)<1e-6,
+        'collision correction must not detach the incense from the hand');
       const actual=grip.getWorldPosition(new THREE.Vector3());
       assert.ok(error<0.14,`hand must reach ash neighborhood: error=${error} at p=${progress}`);
       assert.ok(actual.distanceTo(new THREE.Vector3(desired.x,desired.y,desired.z))<0.14);

@@ -8,6 +8,7 @@ import {
 } from './assets.ts';
 import {clamp01, getIncenseReachWeight, sampleIncenseClipProgress} from './incenseMotion.ts';
 import {aimWristUpright,positionIncenseHand} from './incenseTransforms.ts';
+import {liftElbowClearOfCenser} from './incenseCollision.ts';
 import {getIncenseInsertionTarget} from './incensePlacement.ts';
 import {isHandheldIncenseLit, type Ritual} from './rules.ts';
 
@@ -40,6 +41,9 @@ export default function GLBTraveler({
   const grip=useMemo(()=>model.getObjectByName('IncenseGrip'),[model]);
   const wrist=useMemo(()=>model.getObjectByName('Wrist_R'),[model]);
   const elbow=useMemo(()=>model.getObjectByName('Elbow_R'),[model]);
+  const hand=useMemo(()=>model.getObjectByName('Hand_R'),[model]);
+  const elbowRest=useMemo(()=>elbow?.position.clone(),[elbow]);
+  const handRest=useMemo(()=>hand?.position.clone(),[hand]);
   const shoulder=useMemo(()=>model.getObjectByName('Shoulder_R'),[model]);
   const shoulderRestY=useMemo(()=>shoulder?.position.y??0,[shoulder]);
   const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
@@ -121,12 +125,18 @@ export default function GLBTraveler({
     // aligned with the slot instead of the hand reaching across the entire urn.
     model.position.x=(incenseTarget.x-0.28)*footstep;
 
+    // Animated clip channels drive joint rotation; collision offsets are
+    // temporary and must never accumulate between render frames.
+    if(elbow && elbowRest)elbow.position.copy(elbowRest);
+    if(hand && handRest)hand.position.copy(handRest);
+
     if(grip && wrist && equipped){
       if(placing && shoulder && elbow && insertionStart.current){
         positionIncenseHand(
           shoulder,elbow,wrist,grip,'placing',actionProgress.current,
           insertionStart.current,incenseTarget,
         );
+        if(hand)liftElbowClearOfCenser(shoulder,elbow,hand,wrist);
       }else{
         aimWristUpright(wrist,grip);
       }
@@ -135,7 +145,7 @@ export default function GLBTraveler({
     }
   });
 
-  if(!validation.valid || !grip || !wrist || !elbow || !shoulder){
+  if(!validation.valid || !grip || !wrist || !elbow || !hand || !shoulder){
     throw new Error(
       `Traveler GLB contract invalid; missing clips: ${validation.missingClips.join(', ')||'none'}; missing nodes: ${validation.missingNodes.join(', ')||'none'}.`,
     );
