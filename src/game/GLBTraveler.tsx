@@ -111,9 +111,11 @@ export default function GLBTraveler({
       insertionStart.current=grip.getWorldPosition(new THREE.Vector3()).clone();
     }
     if(!placing)insertionStart.current=null;
-    model.position.z=placing
-      ? -0.62*getIncenseReachWeight(actionProgress.current)
-      : 0;
+    const footstep=placing?getIncenseReachWeight(actionProgress.current):0;
+    model.position.z=-0.62*footstep;
+    // Tiny lateral adjustment for the second/third slot: the shoulder stays
+    // aligned with the slot instead of the hand reaching across the entire urn.
+    model.position.x=incenseTarget.x*footstep;
 
     if(grip && wrist && equipped){
       if(placing && !incenseReleased && shoulder && elbow && insertionStart.current){

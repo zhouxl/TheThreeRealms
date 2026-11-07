@@ -90,6 +90,7 @@ for(const count of [0,1,2]){
       mixer.setTime(clip.duration*progress);
       // Actual actor takes one short step toward the censer during insertion.
       loaded.scene.position.z=-0.62;
+      loaded.scene.position.x=slot.x;
       const desired=sampleOverhandInsertion(start,slot,progress);
       const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
       player.updateMatrixWorld(true);
