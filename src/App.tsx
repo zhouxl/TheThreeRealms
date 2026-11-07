@@ -210,6 +210,7 @@ export default function App(){
               <h2>{INCENSE_WORDS[ritual.step].title}</h2><p>{INCENSE_WORDS[ritual.step].instruction}</p>
               <div className="step-progress">{INCENSE_STEPS.map(step=><span key={step} className={INCENSE_STEPS.indexOf(step)<=INCENSE_STEPS.indexOf(ritual.step==='bowing'?'bow':ritual.step==='placing'?'place':ritual.step)?'current':''}/>)}</div>
               <button className="primary-button" onClick={continueIncense} disabled={busy || ritual.step==='bowing' || ritual.step==='placing'}>{busy?'保存中…':INCENSE_WORDS[ritual.step].button}</button>
+              <small>拖动场景可环绕查看动作 · 桌面滚轮可调整远近</small>
             </>}
             {ritual.kind==='fortune' && ritual.step==='shake' && <>
               <span className="panel-overline">文昌签 · 原创文化体验</span><div className="ritual-symbol">签</div>

@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {alignHeldIncense} from '../src/game/incenseTransforms.ts';
+import {INCENSE_TARGET, INCENSE_STAND} from '../src/game/incensePlacement.ts';
+import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
 
 const binary=readFileSync(new URL('../public/models/traveler-tech-demo.glb',import.meta.url));
 const bytes=binary.buffer.slice(binary.byteOffset,binary.byteOffset+binary.byteLength);
@@ -43,4 +46,29 @@ test('Three.js AnimationMixer can sample the GLB bow and insertion clips',async(
   action.setLoop(THREE.LoopOnce,1).play();
   mixer.setTime(place.duration*0.76);
   assert.ok(rightArm.rotation.x>0.7,'PlaceIncense should move the joint toward the censer');
+});
+
+test('actual skinned rig keeps incense world-up and releases at near-side ash marker',async()=>{
+  const loaded=await loadTraveler();
+  const player=new THREE.Group();
+  player.position.set(INCENSE_STAND.x,0,INCENSE_STAND.z);
+  player.rotation.y=0.35;
+  player.add(loaded.scene);
+  const grip=loaded.scene.getObjectByName('IncenseGrip');
+  assert.ok(grip);
+  const prop=new THREE.Group();grip.add(prop);
+
+  const mixer=new THREE.AnimationMixer(loaded.scene);
+  const clip=loaded.animations.find(c=>c.name==='PlaceIncense');
+  const action=mixer.clipAction(clip);
+  action.setLoop(THREE.LoopOnce,1).play();
+  mixer.setTime(clip.duration*INCENSE_RELEASE_PROGRESS);
+
+  alignHeldIncense(grip,prop,'placing',INCENSE_RELEASE_PROGRESS);
+  player.updateMatrixWorld(true);
+  const stickUp=new THREE.Vector3(0,1,0).applyQuaternion(prop.getWorldQuaternion(new THREE.Quaternion()));
+  assert.ok(stickUp.distanceTo(new THREE.Vector3(0,1,0))<1e-5);
+  const base=prop.getWorldPosition(new THREE.Vector3());
+  const ash=new THREE.Vector3(INCENSE_TARGET.x,INCENSE_TARGET.y,INCENSE_TARGET.z);
+  assert.ok(base.distanceTo(ash)<1e-5,'actual GLB reaches the persisted incense slot at release');
 });
