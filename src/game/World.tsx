@@ -12,6 +12,9 @@ import {
   type IncenseAction,
 } from './incenseMotion.ts';
 import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
+import {
+  DEFAULT_RITUAL_ORBIT, dragRitualOrbit, getRitualCameraPosition, zoomRitualOrbit,
+} from './ritualCamera.ts';
 import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
@@ -347,6 +350,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   const player=useRef<THREE.Group>(null);
   const position=useRef<PlayerPosition>({x:0,z:6.1});
   const yaw=useRef(0);
+  const ritualOrbit=useRef(DEFAULT_RITUAL_ORBIT);
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
   const actionProgress=useRef(0);
@@ -378,15 +382,43 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   },[ritual]);
 
   useEffect(()=>{
-    let active=false,lastX=0;
+    let active=false,lastX=0,lastY=0,pointerId:number|null=null;
     const dom=gl.domElement;
-    const down=(e:PointerEvent)=>{ if(e.pointerType==='mouse' && e.button!==0)return; active=true;lastX=e.clientX; };
-    const move=(e:PointerEvent)=>{if(!active || ritual.kind!=='explore') return; const delta=e.clientX-lastX;lastX=e.clientX;yaw.current-=delta*0.005;};
-    const up=()=>{active=false;};
+    const down=(e:PointerEvent)=>{
+      if(e.pointerType==='mouse' && e.button!==0)return;
+      active=true;
+      pointerId=e.pointerId;
+      lastX=e.clientX;lastY=e.clientY;
+    };
+    const move=(e:PointerEvent)=>{
+      if(!active || pointerId!==e.pointerId)return;
+      const dx=e.clientX-lastX,dy=e.clientY-lastY;
+      lastX=e.clientX;lastY=e.clientY;
+      if(ritual.kind==='explore'){
+        yaw.current-=dx*0.005;
+      }else{
+        // Rituals keep the actor stationary; dragging only orbits the camera.
+        ritualOrbit.current=dragRitualOrbit(ritualOrbit.current,dx,dy);
+      }
+    };
+    const up=(e:PointerEvent)=>{if(pointerId===e.pointerId){active=false;pointerId=null;}};
+    const wheel=(e:WheelEvent)=>{
+      if(ritual.kind==='explore')return;
+      e.preventDefault();
+      ritualOrbit.current=zoomRitualOrbit(ritualOrbit.current,e.deltaY);
+    };
     dom.addEventListener('pointerdown',down);
     window.addEventListener('pointermove',move);
     window.addEventListener('pointerup',up);
-    return ()=>{dom.removeEventListener('pointerdown',down);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);};
+    window.addEventListener('pointercancel',up);
+    dom.addEventListener('wheel',wheel,{passive:false});
+    return ()=>{
+      dom.removeEventListener('pointerdown',down);
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',up);
+      window.removeEventListener('pointercancel',up);
+      dom.removeEventListener('wheel',wheel);
+    };
   },[gl,ritual.kind]);
   useFrame((state,dt)=>{
     const currentAction=ritual.kind==='incense' && isIncenseActionStep(ritual.step) ? ritual.step : null;
@@ -436,8 +468,12 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       look=new THREE.Vector3(current.x,floorHeight(current.z)+1.23,current.z-0.55);
     }else{
       const p=STATIONS[ritual.kind].position;
-      goal=new THREE.Vector3(p[0]+2.15,p[1]+2.15,p[2]+2.7);
-      look=new THREE.Vector3(p[0],p[1]+1.2,p[2]);
+      const focus=ritual.kind==='incense'
+        ? {x:CENSER_POSITION.x,y:1.17,z:CENSER_POSITION.z+(INCENSE_STAND.z-CENSER_POSITION.z)*0.48}
+        : {x:p[0],y:p[1]+1.2,z:p[2]};
+      const orbitGoal=getRitualCameraPosition(focus,ritualOrbit.current);
+      goal=new THREE.Vector3(orbitGoal.x,orbitGoal.y,orbitGoal.z);
+      look=new THREE.Vector3(focus.x,focus.y,focus.z);
     }
     camera.position.lerp(goal,1-Math.exp(-4.5*dt));
     const target=new THREE.Vector3();
