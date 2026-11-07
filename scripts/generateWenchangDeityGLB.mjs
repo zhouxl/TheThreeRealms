@@ -40,16 +40,16 @@ export function generateWenchangDeityGLB() {
     const p=(a,b)=>[cx+rx*Math.sin(a)*Math.cos(b),cy+ry*Math.cos(a),cz+rz*Math.sin(a)*Math.sin(b)];
     for(let i=0;i<rings;i++)for(let j=0;j<steps;j++){
       const a=i*Math.PI/rings,A=(i+1)*Math.PI/rings,b=j*2*Math.PI/steps,B=(j+1)*2*Math.PI/steps;
-      quad(model,mat,p(a,b),p(A,b),p(A,B),p(a,B));
+      quad(model,mat,p(a,b),p(a,B),p(A,B),p(A,b));
     }
   }
   function cylinder(model,mat,[cx,cz],bottom,top,r0,r1,steps=12){
     const p=(r,y,t)=>[cx+r*Math.cos(t),y,cz+r*Math.sin(t)];
     for(let i=0;i<steps;i++){
       const a=i*2*Math.PI/steps,b=(i+1)*2*Math.PI/steps;
-      quad(model,mat,p(r0,bottom,a),p(r0,bottom,b),p(r1,top,b),p(r1,top,a));
-      tri(model,mat,[cx,bottom,cz],p(r0,bottom,b),p(r0,bottom,a));
-      tri(model,mat,[cx,top,cz],p(r1,top,a),p(r1,top,b));
+      quad(model,mat,p(r0,bottom,a),p(r1,top,a),p(r1,top,b),p(r0,bottom,b));
+      tri(model,mat,[cx,bottom,cz],p(r0,bottom,a),p(r0,bottom,b));
+      tri(model,mat,[cx,top,cz],p(r1,top,b),p(r1,top,a));
     }
   }
   // Stone pedestal + timber throne.
