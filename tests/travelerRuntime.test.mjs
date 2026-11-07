@@ -94,6 +94,13 @@ for(const count of [0,1,2]){
       const desired=sampleOverhandInsertion(start,slot,progress);
       const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
       player.updateMatrixWorld(true);
+      if(error>0.14)console.log('IK_DEBUG',JSON.stringify({
+        slot:count,progress,error,expected:desired,
+        shoulder:shoulder.getWorldPosition(new THREE.Vector3()).toArray(),
+        elbow:elbow.getWorldPosition(new THREE.Vector3()).toArray(),
+        wrist:wrist.getWorldPosition(new THREE.Vector3()).toArray(),
+        grip:grip.getWorldPosition(new THREE.Vector3()).toArray(),
+      }));
       const actual=grip.getWorldPosition(new THREE.Vector3());
       assert.ok(error<0.14,`hand must reach ash neighborhood: error=${error} at p=${progress}`);
       assert.ok(actual.distanceTo(new THREE.Vector3(desired.x,desired.y,desired.z))<0.14);
