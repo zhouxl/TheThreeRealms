@@ -6,7 +6,7 @@
 
 ## 快速启动
 
-需要 Node.js 20.19+。
+需要 **Node.js 22 或更新的 22.x 版本**（推荐使用 `.nvmrc` 中的 Node 22）。
 
 ```bash
 npm install
@@ -16,10 +16,12 @@ npm run dev
 打开终端显示的本地地址（通常为 `http://localhost:5173`）。
 
 ```bash
-npm test       # Node 原生测试，无浏览器依赖
-npm run build  # TypeScript 检查和 Vite 构建
+npm run ci:local  # 安装依赖 + 全量测试 + TypeScript / Vite 构建
+npm run ci:quick  # 已安装依赖时，跳过安装的快速验证
 npm run preview
 ```
+
+**重要：** Github Actions 分钟用尽，自动 `push` / `pull_request` 验证已关闭。以后以本地 `npm run ci:local` 的退出结果和 `.local-ci/last-run.log` 作为 PR 验收证据；详细步骤见 [本地 CI 说明](docs/LOCAL_CI.md)。
 
 ## V1.4：首次内置可动画 GLB 技术角色
 
@@ -42,7 +44,7 @@ GLB 由纯 JavaScript 生成器可重复生成：`npm run assets:demo`。此命�
 - 摆福：6 种模板、60 字以内的祝愿、30 个固定挂点，支持私有存储与删除。
 - 浏览器 IndexedDB 私有记录（无后端），重新打开可恢复，清除站点数据后会丢失。
 - 本地记录 ID 优先使用 `crypto.randomUUID()`，在普通 HTTP 局域网调试地址下兼容回退至 `crypto.getRandomValues()`。
-- 纯逻辑单元测试和 GitHub Actions CI 配置。
+- 纯逻辑单元测试、统一的一键本地 CI 验证；GitHub Actions 自动触发已关闭。
 
 ## 项目结构
 
