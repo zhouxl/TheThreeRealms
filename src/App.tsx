@@ -83,6 +83,7 @@ export default function App(){
     if(ritual.step==='done'){leave();return;}
     const next=nextIncenseStep(ritual.step);
     if(next!=='done'){setRitual({kind:'incense',step:next});return;}
+    setError(null);
     setBusy(true);
     try{
       const memory=await addIncenseMemory();
