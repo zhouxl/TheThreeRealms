@@ -41,6 +41,7 @@ export default function GLBTraveler({
   const wrist=useMemo(()=>model.getObjectByName('Wrist_R'),[model]);
   const elbow=useMemo(()=>model.getObjectByName('Elbow_R'),[model]);
   const shoulder=useMemo(()=>model.getObjectByName('Shoulder_R'),[model]);
+  const shoulderRestY=useMemo(()=>shoulder?.position.y??0,[shoulder]);
   const incenseTarget=useMemo(()=>getIncenseInsertionTarget(incenseCount),[incenseCount]);
   const mixer=useMemo(()=>new THREE.AnimationMixer(model),[model]);
   const actions=useMemo(()=>{
@@ -112,6 +113,9 @@ export default function GLBTraveler({
     }
     if(!placing)insertionStart.current=null;
     const footstep=placing?getIncenseReachWeight(actionProgress.current):0;
+    // Raise the shoulder along with the elbow rather than asking a low sleeve
+    // to pass straight through the censer's metal rim.
+    if(shoulder)shoulder.position.y=shoulderRestY+0.18*footstep;
     model.position.z=-0.62*footstep;
     // Tiny lateral adjustment for the second/third slot: the shoulder stays
     // aligned with the slot instead of the hand reaching across the entire urn.

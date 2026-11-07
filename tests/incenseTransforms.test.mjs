@@ -13,7 +13,7 @@ test('overhand path raises incense over ash before lowering vertically',()=>{
   const pause=sampleOverhandInsertion(start,ash,0.55);
   const middle=sampleOverhandInsertion(start,ash,0.65);
   const release=sampleOverhandInsertion(start,ash,INCENSE_RELEASE_PROGRESS);
-  assert.deepEqual(upper,{x:0,y:1.18,z:3.5});
+  assert.deepEqual(upper,{x:0,y:1.3,z:3.5});
   assert.deepEqual(pause,upper);
   assert.equal(middle.x,release.x);
   assert.equal(middle.z,release.z);

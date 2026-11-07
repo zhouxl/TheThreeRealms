@@ -92,6 +92,7 @@ for(const count of [0,1,2,3,4,5]){
       // Actual actor takes one short step toward the censer during insertion.
       loaded.scene.position.z=-0.62;
       loaded.scene.position.x=slot.x;
+      shoulder.position.y=0.21+0.18;
       const desired=sampleOverhandInsertion(start,slot,progress);
       const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
       player.updateMatrixWorld(true);

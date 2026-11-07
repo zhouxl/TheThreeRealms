@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {easeInOut, INCENSE_RELEASE_PROGRESS} from './incenseMotion.ts';
 
 export type IncensePoint=Readonly<{x:number;y:number;z:number}>;
-const HOVER_OFFSET=0.18;
+const HOVER_OFFSET=0.30;
 const approachEnd=0.43;
 const lowerStart=0.55;
 
