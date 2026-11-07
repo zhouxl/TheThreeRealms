@@ -96,7 +96,7 @@ export function reachWithArm(
  * Swivel the *arm* around the shoulder-to-hand axis, keeping the hand on
  * target while moving the elbow up and away from the censer's copper rim.
  * Unlike counter-rotating the incense mesh, this changes actual skinned bones.
- * The 90-degree elbow pole is stable across frames, avoiding IK branch flips.
+ * The over-the-rim elbow pole is stable across frames, avoiding IK branch flips.
  */
 export function poleElbowAwayFromCenser(
   shoulder:THREE.Object3D,wrist:THREE.Object3D,grip:THREE.Object3D,
@@ -114,7 +114,7 @@ export function poleElbowAwayFromCenser(
   const poleWeight=progress<approachEnd
     ? easeInOut(progress/approachEnd)
     : progress<=0.87 ? 1 : 1-easeInOut((progress-0.87)/(1-0.87));
-  const worldDelta=new THREE.Quaternion().setFromAxisAngle(axis,Math.PI/2*poleWeight);
+  const worldDelta=new THREE.Quaternion().setFromAxisAngle(axis,Math.PI*poleWeight);
   const parentWorld=parent.getWorldQuaternion(new THREE.Quaternion());
   const localDelta=parentWorld.clone().invert().multiply(worldDelta).multiply(parentWorld);
   shoulder.quaternion.premultiply(localDelta);
