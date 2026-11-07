@@ -20,13 +20,13 @@ import {
   INCENSE_APPROACH_POINT, INCENSE_APPROACH_TOLERANCE,
   planIncenseApproach, tickApproach,
 } from './incenseApproach.ts';
-import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
+import {resolveDeityAssetUrl, resolveTravelerAssetUrl} from './assets.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
 import GLBTraveler from './GLBTraveler.tsx';
 
 const travelerGlbPath=resolveTravelerAssetUrl(import.meta.env.VITE_TRAVELER_GLB_URL);
-const deityGlbPath=normalizePublicGlbPath(import.meta.env.VITE_DEITY_GLB_URL);
+const deityGlbPath=resolveDeityAssetUrl(import.meta.env.VITE_DEITY_GLB_URL);
 if(import.meta.env.VITE_TRAVELER_GLB_URL && !travelerGlbPath) {
   console.warn('[TheThreeRealms] Ignoring invalid VITE_TRAVELER_GLB_URL; expected /models/name.glb.');
 }

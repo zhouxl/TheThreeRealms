@@ -10,6 +10,28 @@ export function resolveTravelerAssetUrl(configured: string | undefined): string 
   return configured === undefined ? TRAVELER_TECH_DEMO_URL : normalizePublicGlbPath(configured);
 }
 export const DEITY_EXPECTED_HEIGHT = 2.85;
+export const DEITY_TECH_DEMO_URL = '/models/wenchang-deity-tech-demo.glb';
+
+/** Default to shipped technical model; explicit blank restores the procedural placeholder. */
+export function resolveDeityAssetUrl(configured: string | undefined): string | null {
+  return configured === undefined ? DEITY_TECH_DEMO_URL : normalizePublicGlbPath(configured);
+}
+
+export const DEITY_REQUIRED_NODES = [
+  'WenchangRoot','RightHand','LeftHand','WritingBrush','Scroll',
+] as const;
+
+/** Deity model is static but prop attachment names are part of the authoring contract. */
+export function validateDeityContract(names: readonly string[]) {
+  const found=new Set(names);
+  const missingNodes=DEITY_REQUIRED_NODES.filter(name=>!found.has(name));
+  return {valid:missingNodes.length===0,missingNodes};
+}
+
+/** For a model facing +Z, its anatomical right side must be -X. */
+export function isDeityHandednessCorrect(rightX:number,leftX:number):boolean {
+  return Number.isFinite(rightX)&&Number.isFinite(leftX)&&rightX < -0.05 && leftX > 0.05;
+}
 
 /**
  * Restrict asset URLs to the app's public/ directory.
