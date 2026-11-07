@@ -57,6 +57,7 @@ export function selectTravelerClip(
   walking: boolean,
 ): string {
   if (ritualKind === 'incense') {
+    if (incenseStep === 'approach') return 'Walk';
     if (incenseStep === 'bowing') return 'Bow';
     if (incenseStep === 'placing') return 'PlaceIncense';
     // Resting states must not repeatedly loop one-shot Take/Light animations.

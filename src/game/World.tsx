@@ -15,6 +15,10 @@ import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incenseP
 import {
   DEFAULT_RITUAL_ORBIT, dragRitualOrbit, getRitualCameraPosition, zoomRitualOrbit,
 } from './ritualCamera.ts';
+import {
+  INCENSE_APPROACH_POINT, INCENSE_APPROACH_TOLERANCE,
+  planIncenseApproach, tickApproach,
+} from './incenseApproach.ts';
 import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
@@ -254,7 +258,7 @@ function Traveler({
   const smokeUpright = useRef<THREE.Group>(null);
   const walkRing = useRef<THREE.Mesh>(null);
   const step = ritual.kind === 'incense' ? ritual.step : null;
-  const equipped = step !== null && step !== 'done' && !incenseReleased;
+  const equipped = step !== null && step !== 'done' && step !== 'approach' && !incenseReleased;
   const lit = isHandheldIncenseLit(ritual) && !incenseReleased;
 
   useFrame((_, dt) => {
@@ -341,18 +345,23 @@ export type WorldProps = {
   blessings: BlessingMemory[];
   incenseCount: number;
   onIncenseActionComplete: (action:IncenseAction)=>void;
+  onIncenseApproachComplete: ()=>void;
   onNearby: (station:Station|null)=>void;
   onInteract: (station:Station)=>void;
   ready: boolean;
 };
 
-function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onNearby,onInteract,ready}:WorldProps){
+function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onIncenseApproachComplete,onNearby,onInteract,ready}:WorldProps){
   const player=useRef<THREE.Group>(null);
   const position=useRef<PlayerPosition>({x:0,z:6.1});
   const yaw=useRef(0);
   const ritualOrbit=useRef(DEFAULT_RITUAL_ORBIT);
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
+  const approachWaypoints=useRef<PlayerPosition[]>([]);
+  const approachStarted=useRef(false);
+  const approachCompleteRef=useRef(onIncenseApproachComplete);
+  approachCompleteRef.current=onIncenseApproachComplete;
   const actionProgress=useRef(0);
   const actionElapsed=useRef(0);
   const actionStep=useRef<IncenseAction|null>(null);
@@ -366,13 +375,14 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   onNearbyRef.current=onNearby;
 
   useEffect(()=>{
-    if(ritual.kind==='incense') {
-      // Temporary cinematically aligned position close enough for the hand to reach the censer.
-      // Replace the short snap with a walk-up clip once authored assets are available.
-      position.current={x:INCENSE_STAND.x,z:INCENSE_STAND.z};
-      if(player.current) player.current.rotation.y=0;
+    if(ritual.kind==='incense' && ritual.step==='approach'){
+      approachWaypoints.current=planIncenseApproach(position.current);
+      approachStarted.current=true;
+    }else{
+      approachWaypoints.current=[];
+      approachStarted.current=false;
     }
-  },[ritual.kind]);
+  },[ritual.kind,ritual.kind==='incense'?ritual.step:null]);
 
   useEffect(()=>{
     if(ritual.kind!=='incense' || ritual.step!=='placing'){
@@ -441,7 +451,31 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       }
     }
     const pos=position.current;
-    if (ritual.kind==='explore' && ready){
+    if (ritual.kind==='incense' && ritual.step==='approach' && ready){
+      if(approachStarted.current){
+        const point=approachWaypoints.current[0];
+        if(point){
+          const tick=tickApproach(pos,point,Math.min(dt,0.045));
+          position.current=tick.position;
+          isWalking.current=tick.moving;
+          if(tick.moving && player.current){
+            const dx=tick.position.x-pos.x,dz=tick.position.z-pos.z;
+            player.current.rotation.y=THREE.MathUtils.damp(
+              player.current.rotation.y,Math.atan2(dx,-dz),10,dt,
+            );
+          }
+          if(tick.reached)approachWaypoints.current.shift();
+        }else{
+          isWalking.current=false;
+          const remaining=Math.hypot(pos.x-INCENSE_APPROACH_POINT.x,pos.z-INCENSE_APPROACH_POINT.z);
+          if(remaining<=INCENSE_APPROACH_TOLERANCE){
+            approachStarted.current=false; // exactly one completion event
+            if(player.current)player.current.rotation.y=0; // face censer
+            approachCompleteRef.current();
+          }
+        }
+      }
+    }else if (ritual.kind==='explore' && ready){
       const keys=input.current;
       const f=(keys.up?1:0)-(keys.down?1:0);
       const side=(keys.right?1:0)-(keys.left?1:0);
@@ -462,7 +496,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     const nearby=getNearestStation(current);
     if(nearby!==lastNearby.current){lastNearby.current=nearby;onNearbyRef.current(nearby);}
     let goal:THREE.Vector3,look:THREE.Vector3;
-    if(ritual.kind==='explore'){
+    if(ritual.kind==='explore' || (ritual.kind==='incense' && ritual.step==='approach')){
       const distance=4.6,theta=yaw.current;
       goal=new THREE.Vector3(current.x+Math.sin(theta)*distance, floorHeight(current.z)+2.65,current.z+Math.cos(theta)*distance);
       look=new THREE.Vector3(current.x,floorHeight(current.z)+1.23,current.z-0.55);
@@ -486,7 +520,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     const pos=position.current;
     if(ritual.kind!=='explore')return;
     const st=STATIONS[type];
-    if(Math.hypot(pos.x-st.stand[0],pos.z-st.stand[2])<=st.radius)onInteract(type);
+    // The censer itself can be clicked from a distance. Walk there first.
+    if(type==='incense' || Math.hypot(pos.x-st.stand[0],pos.z-st.stand[2])<=st.radius)onInteract(type);
   };
   return <>
     <color attach="background" args={['#c9d8ce']}/>

@@ -39,6 +39,7 @@ const HOLD: TravelerPose = {
 
 /** Button input starts a timed action; it never skips an in-progress action. */
 export function advanceIncenseButton(step: IncenseStep): IncenseStep {
+  if(step==='approach')return 'approach';
   if(step==='bow')return 'bowing';
   if(step==='place')return 'placing';
   if(isIncenseActionStep(step))return step;
@@ -89,7 +90,7 @@ export function hasReleasedIncense(step: IncenseStep, progress: number): boolean
 }
 
 export function getTravelerPose(step: IncenseStep | null, progress: number): TravelerPose {
-  if (step === null || step === 'done') return REST;
+  if (step === null || step === 'done' || step === 'approach') return REST;
 
   const p = clamp01(progress);
   if (step === 'bowing') {
