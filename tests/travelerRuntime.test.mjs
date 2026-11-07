@@ -94,7 +94,7 @@ for(const count of [0,1,2,3,4,5]){
       const weight=getIncenseReachWeight(progress);
       loaded.scene.position.z=-0.62*weight;
       loaded.scene.position.x=(slot.x-0.28)*weight;
-      shoulder.position.y=0.21+0.22*weight;
+      shoulder.position.y=0.21+0.34*weight;
       const desired=sampleOverhandInsertion(start,slot,progress);
       const error=positionIncenseHand(shoulder,elbow,wrist,grip,'placing',progress,start,slot);
       player.updateMatrixWorld(true);

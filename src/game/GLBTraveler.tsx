@@ -115,7 +115,7 @@ export default function GLBTraveler({
     const footstep=placing?getIncenseReachWeight(actionProgress.current):0;
     // Raise the shoulder along with the elbow rather than asking a low sleeve
     // to pass straight through the censer's metal rim.
-    if(shoulder)shoulder.position.y=shoulderRestY+0.22*footstep;
+    if(shoulder)shoulder.position.y=shoulderRestY+0.34*footstep;
     model.position.z=-0.62*footstep;
     // Tiny lateral adjustment for the second/third slot: the shoulder stays
     // aligned with the slot instead of the hand reaching across the entire urn.
