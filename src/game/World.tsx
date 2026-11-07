@@ -12,6 +12,7 @@ import {
   type IncenseAction,
 } from './incenseMotion.ts';
 import {CENSER_POSITION, INCENSE_STAND, getVisibleIncenseSlots} from './incensePlacement.ts';
+import {incenseSettlementOffset} from './incenseTransforms.ts';
 import {
   DEFAULT_RITUAL_ORBIT, dragRitualOrbit, getRitualCameraPosition, zoomRitualOrbit,
 } from './ritualCamera.ts';
@@ -172,9 +173,44 @@ function Smoke({position, particleRadius = 0.17, riseHeight = 1.65, drift = 0.12
     </mesh>)}
   </group>;
 }
+/** A released incense falls the last short distance into the ash by itself.
+ * The hand does not have to descend into the copper urn. */
+function PlacedIncense({
+  position,smoking,settling,
+}:{
+  position:[number,number,number];smoking:boolean;settling:boolean;
+}) {
+  const group=useRef<THREE.Group>(null);
+  const seconds=useRef(0);
+  useFrame((_,dt)=>{
+    if(!group.current)return;
+    if(settling){
+      seconds.current=Math.min(0.35,seconds.current+Math.min(dt,0.05));
+      group.current.position.y=incenseSettlementOffset(seconds.current);
+    }else{
+      seconds.current=0;
+      group.current.position.y=0;
+    }
+  });
+  return <group position={position}>
+    <group ref={group} position={[0,settling?incenseSettlementOffset(0):0,0]}>
+      <mesh position={[0,1.20,0]} castShadow>
+        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
+        <meshStandardMaterial color="#af8457" roughness={0.95}/>
+      </mesh>
+      <mesh position={[0,1.405,0]}>
+        <sphereGeometry args={[0.022,8,8]}/>
+        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
+      </mesh>
+      {smoking && <Smoke position={[0,1.43,0]}
+        particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
+    </group>
+  </group>;
+}
+
 function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;previewPlaced:boolean}) {
   const visibleSticks=getVisibleIncenseSlots(incenseCount,previewPlaced);
-  const smokeStick=visibleSticks[visibleSticks.length-1];
+  const lastStickIndex=visibleSticks.length-1;
   return <group position={[CENSER_POSITION.x,0,CENSER_POSITION.z]}>
     <mesh position={[0,0.61,0]} castShadow>
       <cylinderGeometry args={[0.57,0.39,0.85,16]}/>
@@ -194,18 +230,11 @@ function IncenseBurner({incenseCount,previewPlaced}:{incenseCount:number;preview
     </mesh>)}
     {/* Only committed sticks, plus a released-but-not-yet-committed preview,
         occupy slots. Do not permanently render fake sticks in an empty censer. */}
-    {visibleSticks.map(([x,z],i)=><group key={i} position={[x,0,z]}>
-      <mesh position={[0,1.20,0]} castShadow>
-        <cylinderGeometry args={[0.014,0.014,0.40,6]}/>
-        <meshStandardMaterial color="#af8457" roughness={0.95}/>
-      </mesh>
-      <mesh position={[0,1.405,0]}>
-        <sphereGeometry args={[0.022,8,8]}/>
-        <meshStandardMaterial color="#da6948" emissive="#ef5a32" emissiveIntensity={0.88}/>
-      </mesh>
-    </group>)}
-    {smokeStick && <Smoke position={[smokeStick[0],1.43,smokeStick[1]]}
-      particleRadius={0.07} riseHeight={0.80} drift={0.08} color="#c8c4b9"/>}
+    {visibleSticks.map(([x,z],i)=>
+      <PlacedIncense key={i} position={[x,0,z]}
+        smoking={i===lastStickIndex}
+        settling={previewPlaced&&i===lastStickIndex}/>
+    )}
   </group>;
 }
 function FortuneTable() {

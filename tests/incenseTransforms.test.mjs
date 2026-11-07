@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  aimWristUpright,sampleOverhandInsertion,getSafeHandReleaseTarget,HAND_RELEASE_CLEARANCE,
+  aimWristUpright,sampleOverhandInsertion,getSafeHandReleaseTarget,
+  HAND_RELEASE_CLEARANCE,INCENSE_SETTLING_SECONDS,incenseSettlementOffset,
 } from '../src/game/incenseTransforms.ts';
 import {INCENSE_RELEASE_PROGRESS} from '../src/game/incenseMotion.ts';
 
@@ -50,4 +51,12 @@ test('hand releases the incense ABOVE the ash; only the stick settles down',()=>
   assert.ok(hovered.y>reached.y);
   const withdrawn=sampleOverhandInsertion(start,handTarget,0.81);
   assert.ok(withdrawn.y>reached.y);
+});
+
+test('released incense settles smoothly from hand height to final ash slot',()=>{
+  assert.equal(incenseSettlementOffset(0),HAND_RELEASE_CLEARANCE);
+  assert.ok(incenseSettlementOffset(0.1)<HAND_RELEASE_CLEARANCE);
+  assert.ok(incenseSettlementOffset(0.2)<incenseSettlementOffset(0.1));
+  assert.equal(incenseSettlementOffset(INCENSE_SETTLING_SECONDS),0);
+  assert.equal(incenseSettlementOffset(99),0);
 });

@@ -6,6 +6,13 @@ export type IncensePoint=Readonly<{x:number;y:number;z:number}>;
 /** Keep the whole forearm above the metal lip. The held stick is released here
  * and then settles into the ash by itself; the hand never enters the bowl. */
 export const HAND_RELEASE_CLEARANCE=0.18;
+export const INCENSE_SETTLING_SECONDS=0.35;
+
+/** After the hand releases above the lip, the incense settles into ash. */
+export function incenseSettlementOffset(elapsedSeconds:number):number {
+  const progress=Math.max(0,Math.min(1,elapsedSeconds/INCENSE_SETTLING_SECONDS));
+  return HAND_RELEASE_CLEARANCE*(1-easeInOut(progress));
+}
 export function getSafeHandReleaseTarget(ash:IncensePoint):IncensePoint {
   return {x:ash.x,y:ash.y+HAND_RELEASE_CLEARANCE,z:ash.z};
 }
