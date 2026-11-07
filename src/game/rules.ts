@@ -18,9 +18,10 @@ export const STATIONS: Readonly<Record<Station, { label: string; position: Vec3;
 };
 
 export type PlayerPosition = { x: number; z: number };
+export type IncenseStep = 'take' | 'light' | 'hold' | 'bow' | 'bowing' | 'place' | 'placing' | 'done';
 export type Ritual =
   | { kind: 'explore' }
-  | { kind: 'incense'; step: 'take' | 'light' | 'hold' | 'bow' | 'place' | 'done' }
+  | { kind: 'incense'; step: IncenseStep }
   | { kind: 'fortune'; step: 'shake' | 'reading'; number?: number }
   | { kind: 'blessing'; step: 'edit' | 'done'; slotId?: number };
 
@@ -35,7 +36,8 @@ export function nextIncenseStep(step: (typeof INCENSE_STEPS)[number]): (typeof I
  * placed into the burner, the ember and smoke must follow the held stick. */
 export function isHandheldIncenseLit(ritual: Ritual): boolean {
   return ritual.kind === 'incense' && (
-    ritual.step === 'hold' || ritual.step === 'bow' || ritual.step === 'place'
+    ritual.step === 'hold' || ritual.step === 'bow' || ritual.step === 'bowing' ||
+    ritual.step === 'place' || ritual.step === 'placing'
   );
 }
 
