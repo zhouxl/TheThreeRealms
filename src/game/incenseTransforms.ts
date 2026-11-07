@@ -14,7 +14,7 @@ const lowerStart=0.55;
 export function sampleOverhandInsertion(
   start:IncensePoint,target:IncensePoint,progress:number
 ):IncensePoint {
-  const p=Math.max(0,Math.min(INCENSE_RELEASE_PROGRESS,progress));
+  const p=Math.max(0,Math.min(1,progress));
   const hover={x:target.x,y:target.y+HOVER_OFFSET,z:target.z};
   if(p<approachEnd){
     const t=easeInOut(p/approachEnd);
@@ -25,8 +25,23 @@ export function sampleOverhandInsertion(
     };
   }
   if(p<=lowerStart)return hover;
-  const lower=easeInOut((p-lowerStart)/(INCENSE_RELEASE_PROGRESS-lowerStart));
-  return {x:target.x,y:hover.y-HOVER_OFFSET*lower,z:target.z};
+  if(p<=INCENSE_RELEASE_PROGRESS){
+    const lower=easeInOut((p-lowerStart)/(INCENSE_RELEASE_PROGRESS-lowerStart));
+    return {x:target.x,y:hover.y-HOVER_OFFSET*lower,z:target.z};
+  }
+  // Once released, the empty hand travels straight back UP through the
+  // opening before it retreats; otherwise the forearm clips the front rim.
+  const exit=0.87;
+  if(p<=exit){
+    const lift=easeInOut((p-INCENSE_RELEASE_PROGRESS)/(exit-INCENSE_RELEASE_PROGRESS));
+    return {x:target.x,y:target.y+HOVER_OFFSET*lift,z:target.z};
+  }
+  const withdraw=easeInOut((p-exit)/(1-exit));
+  return {
+    x:hover.x+(start.x-hover.x)*withdraw,
+    y:hover.y+(start.y-hover.y)*withdraw,
+    z:hover.z+(start.z-hover.z)*withdraw,
+  };
 }
 
 /**
@@ -77,15 +92,48 @@ export function reachWithArm(
   return grip.getWorldPosition(new THREE.Vector3()).distanceTo(wanted);
 }
 
+/**
+ * Swivel the *arm* around the shoulder-to-hand axis, keeping the hand on
+ * target while moving the elbow up and away from the censer's copper rim.
+ * Unlike counter-rotating the incense mesh, this changes actual skinned bones.
+ * The 90-degree elbow pole is stable across frames, avoiding IK branch flips.
+ */
+export function poleElbowAwayFromCenser(
+  shoulder:THREE.Object3D,wrist:THREE.Object3D,grip:THREE.Object3D,
+  target:IncensePoint,progress:number,
+):void {
+  const parent=shoulder.parent;
+  if(!parent)throw new Error('Shoulder_R must have a parent');
+  shoulder.updateWorldMatrix(true,true);
+  const origin=shoulder.getWorldPosition(new THREE.Vector3());
+  const axis=new THREE.Vector3(target.x-origin.x,target.y-origin.y,target.z-origin.z);
+  if(axis.lengthSq()<1e-8)return;
+  axis.normalize();
+
+  const release=INCENSE_RELEASE_PROGRESS;
+  const poleWeight=progress<approachEnd
+    ? easeInOut(progress/approachEnd)
+    : progress<=0.87 ? 1 : 1-easeInOut((progress-0.87)/(1-0.87));
+  const worldDelta=new THREE.Quaternion().setFromAxisAngle(axis,Math.PI/2*poleWeight);
+  const parentWorld=parent.getWorldQuaternion(new THREE.Quaternion());
+  const localDelta=parentWorld.clone().invert().multiply(worldDelta).multiply(parentWorld);
+  shoulder.quaternion.premultiply(localDelta);
+  shoulder.updateWorldMatrix(true,true);
+  aimWristUpright(wrist,grip);
+}
+
 /** Convenience for the actual runtime performer; always leave the prop rooted to the wrist. */
 export function positionIncenseHand(
   shoulder:THREE.Object3D,elbow:THREE.Object3D,wrist:THREE.Object3D,
   grip:THREE.Object3D,step:string|null,progress:number,
   start:IncensePoint,target:IncensePoint,
 ):number {
-  if(step==='placing'&&progress<=INCENSE_RELEASE_PROGRESS){
+  if(step==='placing'){
     const point=sampleOverhandInsertion(start,target,progress);
-    return reachWithArm(shoulder,elbow,wrist,grip,point);
+    reachWithArm(shoulder,elbow,wrist,grip,point);
+    poleElbowAwayFromCenser(shoulder,wrist,grip,point,progress);
+    return grip.getWorldPosition(new THREE.Vector3()).distanceTo(
+      new THREE.Vector3(point.x,point.y,point.z));
   }
   aimWristUpright(wrist,grip);
   return 0;

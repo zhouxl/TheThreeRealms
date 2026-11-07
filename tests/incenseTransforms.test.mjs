@@ -19,6 +19,10 @@ test('overhand path raises incense over ash before lowering vertically',()=>{
   assert.equal(middle.z,release.z);
   assert.ok(pause.y>middle.y&&middle.y>release.y);
   assert.deepEqual(release,ash);
+  const lifted=sampleOverhandInsertion(start,ash,0.87);
+  const back=sampleOverhandInsertion(start,ash,1);
+  assert.deepEqual(lifted,upper,'empty hand first exits vertically above the rim');
+  assert.deepEqual(back,start,'then hand retracts behind the lip');
 });
 
 test('the wrist, not the stick, corrects grip orientation in world space',()=>{

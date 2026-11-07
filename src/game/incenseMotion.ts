@@ -81,7 +81,8 @@ export function sampleIncenseClipProgress(action:IncenseAction,progress:number):
 export function getIncenseReachWeight(progress:number):number{
   const p=clamp01(progress);
   const advance=easeInOut(p/0.43);
-  const recover=easeInOut((p-INCENSE_RELEASE_PROGRESS)/(1-INCENSE_RELEASE_PROGRESS));
+  // Keep the step forward until the arm has lifted clear of the rim.
+  const recover=easeInOut((p-0.87)/(1-0.87));
   return advance*(1-recover);
 }
 
