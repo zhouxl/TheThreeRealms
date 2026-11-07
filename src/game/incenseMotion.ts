@@ -90,8 +90,9 @@ export function getTravelerPose(step: IncenseStep | null, progress: number): Tra
       armsForward: 1.03 + 0.4 * reachWeight,
       // Waist pivot lowers the hand in world space; local movement only fine-tunes contact.
       handY: HOLD.handY - 0.02 * reachWeight,
-      handZ: HOLD.handZ - 0.49 * reachWeight,
-      incenseTilt: 0.13 * reachWeight,
+      handZ: HOLD.handZ - 0.59 * reachWeight,
+      // Counter the torso lean so the incense remains close to vertical.
+      incenseTilt: 0.18 * reachWeight,
     };
   }
   return HOLD;

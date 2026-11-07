@@ -74,18 +74,20 @@ test('button presses cannot skip the visible bow or place animations', () => {
 
 test('a released incense stick becomes visible in the censer', () => {
   assert.equal(getVisibleIncenseSlots(0,false).length,0);
-  assert.deepEqual(getVisibleIncenseSlots(0,true),[[0,0]]);
+  assert.deepEqual(getVisibleIncenseSlots(0,true),[[0,0.30]]);
   // Once committed the same position remains occupied, not an empty burner.
-  assert.deepEqual(getVisibleIncenseSlots(1,false),[[0,0]]);
+  assert.deepEqual(getVisibleIncenseSlots(1,false),[[0,0.30]]);
   assert.equal(getVisibleIncenseSlots(1,true).length,2);
   assert.equal(getVisibleIncenseSlots(1000,false).length,INCENSE_MAX_VISIBLE);
   assert.equal(getVisibleIncenseSlots(-2,true).length,1);
+  assert.ok(INCENSE_TARGET.z > 3.2 && INCENSE_TARGET.z < 3.75,'slot remains inside ash');
 });
 
 test('the incense base is aligned with the ash at the insertion release marker', () => {
   const hold=getHeldIncenseBaseWorld(getTravelerPose('hold',0));
   const release=getHeldIncenseBaseWorld(getTravelerPose('placing',INCENSE_RELEASE_PROGRESS));
   assert.ok(hold.y>INCENSE_TARGET.y+0.1,'the initial stick should be above ash');
+  assert.ok(Math.abs(4.6-3.2)>1.3,'traveler stands clear of the censer');
   assert.ok(Math.abs(release.x-INCENSE_TARGET.x)<0.01);
   assert.ok(Math.abs(release.y-INCENSE_TARGET.y)<0.12);
   assert.ok(Math.abs(release.z-INCENSE_TARGET.z)<0.15);
