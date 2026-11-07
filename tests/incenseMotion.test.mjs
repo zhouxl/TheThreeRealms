@@ -27,9 +27,9 @@ test('bow leans forward and returns to its held-incense posture', () => {
   const start = getTravelerPose('bowing', 0);
   const middle = getTravelerPose('bowing', 0.5);
   const end = getTravelerPose('bowing', 1);
-  assert.equal(start.torsoPitch, 0);
+  assert.ok(Math.abs(start.torsoPitch) < 1e-9);
   assert.ok(middle.torsoPitch < -0.35);
-  assert.equal(end.torsoPitch, 0);
+  assert.ok(Math.abs(end.torsoPitch) < 1e-9);
   assert.equal(start.handZ, end.handZ);
 });
 
@@ -40,7 +40,7 @@ test('insertion reaches the censer and then retracts', () => {
   assert.ok(reach.handZ < start.handZ - 0.5);
   assert.ok(reach.handY < start.handY - 0.1);
   assert.equal(end.handZ, start.handZ);
-  assert.equal(end.torsoPitch, 0);
+  assert.ok(Math.abs(end.torsoPitch) < 1e-9);
 });
 
 test('incense is detached once at the placing release marker', () => {
