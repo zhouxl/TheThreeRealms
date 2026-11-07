@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  INCENSE_ACTION_SECONDS, INCENSE_RELEASE_PROGRESS, incenseActionProgress,
+  INCENSE_ACTION_SECONDS, INCENSE_RELEASE_PROGRESS, advanceIncenseButton, incenseActionProgress,
   getTravelerPose, hasReleasedIncense, isIncenseActionStep,
 } from '../src/game/incenseMotion.ts';
 
@@ -54,4 +54,15 @@ test('incense is detached once at the placing release marker', () => {
 test('free exploration and completed ritual return an idle pose', () => {
   assert.deepEqual(getTravelerPose(null, 0), getTravelerPose('done', 0));
   assert.equal(getTravelerPose(null, 0).armsForward, 0);
+});
+
+test('button presses cannot skip the visible bow or place animations', () => {
+  assert.equal(advanceIncenseButton('take'), 'light');
+  assert.equal(advanceIncenseButton('light'), 'hold');
+  assert.equal(advanceIncenseButton('hold'), 'bow');
+  assert.equal(advanceIncenseButton('bow'), 'bowing');
+  assert.equal(advanceIncenseButton('bowing'), 'bowing');
+  assert.equal(advanceIncenseButton('place'), 'placing');
+  assert.equal(advanceIncenseButton('placing'), 'placing');
+  assert.equal(advanceIncenseButton('done'), 'done');
 });

@@ -2,7 +2,7 @@
  * V1.2's procedural stand-in for authored skeletal GLB animation clips.
  * Pure timing and pose functions make keyframes independent from rendering FPS.
  */
-import type { IncenseStep } from './rules.ts';
+import {nextIncenseStep, type IncenseStep} from './rules.ts';
 
 export type IncenseAction = 'bowing' | 'placing';
 
@@ -35,6 +35,14 @@ const HOLD: TravelerPose = {
   handZ: -0.43,
   incenseTilt: 0,
 };
+
+/** Button input starts a timed action; it never skips an in-progress action. */
+export function advanceIncenseButton(step: IncenseStep): IncenseStep {
+  if(step==='bow')return 'bowing';
+  if(step==='place')return 'placing';
+  if(isIncenseActionStep(step))return step;
+  return nextIncenseStep(step);
+}
 
 export function isIncenseActionStep(step: IncenseStep): step is IncenseAction {
   return step === 'bowing' || step === 'placing';
