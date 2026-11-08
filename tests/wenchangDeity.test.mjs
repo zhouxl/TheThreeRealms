@@ -48,6 +48,47 @@ test('Wenchang static GLB is reproducible, structurally valid and has no externa
   }
 });
 
+test('V1.5 sculpt has no zero-area triangles or unstable pole normals',()=>{
+  // Degenerate ellipsoid polar caps can produce different normals across
+  // runtime/CPU architectures despite a visually similar GLB.
+  for(const [meshIndex,mesh] of json.meshes.entries()) {
+    for(const [primitiveIndex,primitive] of mesh.primitives.entries()) {
+      const positions=json.accessors[primitive.attributes.POSITION];
+      const pv=json.bufferViews[positions.bufferView];
+      assert.equal(positions.componentType,5126);
+      assert.equal(positions.type,'VEC3');
+      assert.equal(positions.count%3,0,'Every vertex triplet forms a triangle');
+      function p(i){
+        const offset=pv.byteOffset+(positions.byteOffset||0)+i*3*4;
+        return [
+          bin.readFloatLE(offset),bin.readFloatLE(offset+4),bin.readFloatLE(offset+8),
+        ];
+      }
+      for(let v=0;v<positions.count;v+=3) {
+        const [a,b,c]=[p(v),p(v+1),p(v+2)];
+        const ab=b.map((x,j)=>x-a[j]),ac=c.map((x,j)=>x-a[j]);
+        const cross=[
+          ab[1]*ac[2]-ab[2]*ac[1],
+          ab[2]*ac[0]-ab[0]*ac[2],
+          ab[0]*ac[1]-ab[1]*ac[0],
+        ];
+        const length=Math.hypot(...cross);
+        assert.ok(length>1e-12,
+          `Degenerate triangle in mesh ${meshIndex}, primitive ${primitiveIndex}, triangle ${v/3}: cross=${length}`);
+      }
+      const normals=json.accessors[primitive.attributes.NORMAL];
+      const nv=json.bufferViews[normals.bufferView];
+      for(let v=0;v<normals.count;v++){
+        const off=nv.byteOffset+(normals.byteOffset||0)+v*12;
+        const xyz=[bin.readFloatLE(off),bin.readFloatLE(off+4),bin.readFloatLE(off+8)];
+        assert.ok(xyz.every(Number.isFinite));
+        assert.ok(Math.abs(Math.hypot(...xyz)-1)<1e-4,
+          `Unstable/unnormalized normal in mesh ${meshIndex}, vertex ${v}`);
+      }
+    }
+  }
+});
+
 test('deity sculpture contract contains root, both hands and correct props',()=>{
   const byName=new Map(json.nodes.map((node,i)=>[node.name,{...node,index:i}]));
   for(const name of ['WenchangRoot','RightHand','LeftHand','WritingBrush','Scroll','DeitySculpture']){
