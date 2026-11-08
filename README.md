@@ -2,7 +2,7 @@
 
 **山间文昌殿** — 一个以温暖、静谧、治愈为美术方向的 Web 3D 单人可玩原型。
 
-> 当前状态：可探索的程序化 3D **灰盒原型**，不是最终美术制作版本；不含多人、登录、支付或真实宗教仪式服务。
+> 当前状态：可探索的 Web 3D 原型，内置低多边形 GLB 旅人与文昌帝君技术模型，建筑仍为灰盒；**不是最终美术制作版本**，不含多人、登录、支付或真实宗教仪式服务。
 
 ## 快速启动
 
@@ -23,6 +23,14 @@ npm run preview
 
 **重要：** Github Actions 分钟用尽，自动 `push` / `pull_request` 验证已关闭。以后以本地 `npm run ci:local` 的退出结果和 `.local-ci/last-run.log` 作为 PR 验收证据；详细步骤见 [本地 CI 说明](docs/LOCAL_CI.md)。
 
+## V1.5：首份文昌帝君静态 GLB 技术模型
+
+文昌殿现在默认显示实物二进制 `public/models/wenchang-deity-tech-demo.glb`，造型为带座的国风学官木雕技术模型：旧木色、朱红/青色袍服、金饰、长须、冠冕，**面朝前庭 +Z，神像自身右手（-X）执笔、左手（+X）托卷**。这是可加载、可见、可替换的低多边形技术模型，不是最终经过文化审校的宗教造像。
+
+需要恢复原有程序化神像以对照画面时，在 `.env.local` 写 `VITE_DEITY_GLB_URL=`（空值）；使用正式美术 GLB 时写 `VITE_DEITY_GLB_URL=/models/wenchang.glb` 并将文件放入 `public/models/`。神像尺寸 2.85m（含底座）、Y-up、前方 +Z，要求含 `WenchangRoot`、`RightHand`、`LeftHand`、`WritingBrush`、`Scroll` 这些节点。
+
+可以使用 `npm run assets:deity-demo` 重新生成这份技术模型；**不要覆盖同名文件存储正式美术资产**，以免被生成脚本覆盖。
+
 ## V1.4：首次内置可动画 GLB 技术角色
 
 仓库现已包含真实二进制 GLB：`public/models/traveler-tech-demo.glb`（**低多边形技术验证资产，不是最终美术**）。不需要下载额外模型，运行 `npm run dev` 即默认加载并显示该小旅人。它是 glTF 2.0 带蒙皮的模型，包含 13 个关节（新增右肘和右腕）、`IncenseGrip` 手持香挂点，以及 `Idle`、`Walk`、`HoldIncense`、`Bow`、`PlaceIncense` 动画。
@@ -30,7 +38,7 @@ npm run preview
 如果希望恢复 V1.2 程序化角色以作对比，创建 `.env.local` 并设置 `VITE_TRAVELER_GLB_URL=`（空值），然后重启开发服务器。
 
 正式美术师制作的 GLB 可以替换技术验证模型：
-`VITE_TRAVELER_GLB_URL=/models/traveler.glb`，文件放入 `public/models/` 并符合 `docs/ASSET_CONTRACT.md` 契约。文昌帝君仍为程序化占位，`VITE_DEITY_GLB_URL` 未配置时不会加载外部文件。
+`VITE_TRAVELER_GLB_URL=/models/traveler.glb`，文件放入 `public/models/` 并符合 `docs/ASSET_CONTRACT.md` 契约。文昌帝君 V1.5 默认加载内置的静态 GLB 技术模型（可设置空值回退程序化神像）。
 
 GLB 由纯 JavaScript 生成器可重复生成：`npm run assets:demo`。此命令**会覆盖** `public/models/traveler-tech-demo.glb`，请勿把正式艺术资产保存在此文件名下。测试会验证提交的二进制与生成器一致。
 
@@ -80,7 +88,7 @@ src/
 
 ## V1.3：导入自己的 GLB 模型（已实现）
 
-项目支持**可选的**正式 GLB 渲染器和骨骼动画适配器；V1.4 默认使用内置技术验证角色 GLB，文昌帝君尚无正式 GLB 文件。
+项目支持**可选的**正式 GLB 渲染器和骨骼动画适配器。V1.4 内置旅人 GLB，V1.5 内置文昌帝君静态 GLB；两者均是技术验证模型，尚未有最终美术文件。
 
 要试用自制模型：
 

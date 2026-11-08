@@ -10,7 +10,8 @@
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "assets:demo": "node scripts/writeTravelerGLB.mjs",
     "ci:local": "node scripts/local-ci.mjs",
-    "ci:quick": "node scripts/local-ci.mjs --skip-install"
+    "ci:quick": "node scripts/local-ci.mjs --skip-install",
+    "assets:deity-demo": "node scripts/writeWenchangDeityGLB.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.0",

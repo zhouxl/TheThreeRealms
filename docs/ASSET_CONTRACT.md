@@ -82,3 +82,13 @@
 - 每条记录按最多六个可到达的**近侧灰面槽位**选取实际落点，手部落点与最终香炉立香一致。
 - 附加的 CCD 技术 IK 是过渡方案，采用骨骼旋转驱动肘/肩，不是最终商业级手指关节与脚底接触动画。正式美术资产仍需稳定的右肘/右腕节点，并验证动作与角色衣袖穿插。
 - 上香期间的镜头可自由环绕、缩放，不改变角色方向、手腕插香目标及 IndexedDB 保存规则。
+
+## V1.5 文昌帝君 GLB 技术资产合同
+
+- 默认加载：`public/models/wenchang-deity-tech-demo.glb`，静态 glTF 2.0 技术模型。可设置 `VITE_DEITY_GLB_URL=`（空值）切回程序化神像；自制文件用同源 `/models/wenchang.glb` 替代。
+- **Y-up、单位米、世界 +Z 面朝前庭；地面到冠顶为 2.85m（含台座）**，根节点在地面。画面中不应与大殿供案或屋顶穿插。
+- 必需节点 `WenchangRoot`、`RightHand`、`LeftHand`、`WritingBrush`、`Scroll`：静态资产也要有独立的持物节点。`WritingBrush` 为 `RightHand` 后代；`Scroll` 为 `LeftHand` 后代。
+- **人物的右手 = 本地 -X，左手 = +X**（对面观察者的左右相反）。GLB 校验只保证节点、坐标和持物关系；不代替历史/文化造像审校。
+- 默认模型是无需外部纹理的低多边形 PBR 技术版本，不是专业木雕。未来正式 GLB 应保留可见的笔杆、笔锋、卷轴、冠、袍服及对应持物侧别。
+- 模型不可用、手位左右颠倒或必需节点缺失时触发 `AssetBoundary`，回退至程序化神像并输出 Console 诊断。
+- 可运行 `npm run assets:deity-demo` 重建二进制；在 `tests/wenchangDeity.test.mjs` 中验证生成器字节一致、GLTFLoader 解析、2.85m 边界和手持物归属。

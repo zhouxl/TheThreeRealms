@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizePublicGlbPath, resolveTravelerAssetUrl, validateTravelerContract, evaluateModelHeight,
+  normalizePublicGlbPath, resolveTravelerAssetUrl, resolveDeityAssetUrl,
+  validateDeityContract, isDeityHandednessCorrect,
+  validateTravelerContract, evaluateModelHeight,
   selectTravelerClip,
 } from '../src/game/assets.ts';
 
@@ -53,4 +55,23 @@ test('V1.4 uses real technical traveler GLB by default, with explicit opt-out', 
   assert.equal(resolveTravelerAssetUrl(''),null);
   assert.equal(resolveTravelerAssetUrl('/models/custom-traveler.glb'),'/models/custom-traveler.glb');
   assert.equal(resolveTravelerAssetUrl('https://example.com/remote.glb'),null);
+});
+
+test('V1.5 loads bundled deity model by default with explicit opt-out',()=>{
+  assert.equal(resolveDeityAssetUrl(undefined),'/models/wenchang-deity-tech-demo.glb');
+  assert.equal(resolveDeityAssetUrl(''),null);
+  assert.equal(resolveDeityAssetUrl('/models/custom-wenchang.glb'),'/models/custom-wenchang.glb');
+  assert.equal(resolveDeityAssetUrl('https://remote.invalid/figure.glb'),null);
+});
+
+test('deity contract requires separate carved figure and right/left ritual props',()=>{
+  assert.deepEqual(validateDeityContract(['WenchangRoot','RightHand','LeftHand','WritingBrush','Scroll']),{
+    valid:true,missingNodes:[],
+  });
+  assert.deepEqual(validateDeityContract(['WenchangRoot','RightHand']),{
+    valid:false,missingNodes:['LeftHand','WritingBrush','Scroll'],
+  });
+  assert.equal(isDeityHandednessCorrect(-0.75,0.75),true);
+  assert.equal(isDeityHandednessCorrect(0.75,-0.75),false);
+  assert.equal(isDeityHandednessCorrect(NaN,0.75),false);
 });
