@@ -37,10 +37,19 @@ export function generateWenchangDeityGLB() {
     quad(model,mat,[x,y,Z],[x,y,z],[X,y,z],[X,y,Z]);
   }
   function ellipsoid(model,mat,[cx,cy,cz],[rx,ry,rz],rings=7,steps=12){
-    const p=(a,b)=>[cx+rx*Math.sin(a)*Math.cos(b),cy+ry*Math.cos(a),cz+rz*Math.sin(a)*Math.sin(b)];
+    // At the exact poles sin(PI) is tiny but nonzero; rounding differences
+    // across platforms otherwise make nearly zero-area cap triangles and
+    // unstable face normals. Force pole radius to exactly zero.
+    const p=(a,b)=>{
+      const sine=Math.sin(a),radius=Math.abs(sine)<1e-12?0:sine;
+      return [cx+rx*radius*Math.cos(b),cy+ry*Math.cos(a),cz+rz*radius*Math.sin(b)];
+    };
     for(let i=0;i<rings;i++)for(let j=0;j<steps;j++){
       const a=i*Math.PI/rings,A=(i+1)*Math.PI/rings,b=j*2*Math.PI/steps,B=(j+1)*2*Math.PI/steps;
-      quad(model,mat,p(a,b),p(a,B),p(A,B),p(A,b));
+      // Do not create the degenerate first/last triangle at either pole:
+      // adjacent longitude vertices collapse to the same point there.
+      if(i!==0)tri(model,mat,p(a,b),p(a,B),p(A,B));
+      if(i!==rings-1)tri(model,mat,p(a,b),p(A,B),p(A,b));
     }
   }
   function cylinder(model,mat,[cx,cz],bottom,top,r0,r1,steps=12){
@@ -122,7 +131,12 @@ export function generateWenchangDeityGLB() {
     align();
     const size=componentType===5126?4:2;
     const raw=new Uint8Array(values.length*size),view=new DataView(raw.buffer);
-    values.forEach((v,i)=>componentType===5126?view.setFloat32(i*size,v,true):view.setUint16(i*size,v,true));
+    // Quantize authored geometry/normals to micrometre precision before
+    // Float32 encoding. This avoids architecture-dependent bit flips from
+    // trigonometric approximation differences on Apple Silicon vs x86.
+    values.forEach((v,i)=>componentType===5126
+      ? view.setFloat32(i*size,Math.round(v*1e6)/1e6,true)
+      : view.setUint16(i*size,v,true));
     const bufferView=json.bufferViews.length;
     json.bufferViews.push({buffer:0,byteOffset:data.length,byteLength:raw.length,target});
     for(const b of raw)data.push(b);
