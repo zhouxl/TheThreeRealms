@@ -1,17 +1,67 @@
-name: CI (manual only)
-# GitHub Actions minutes are exhausted: no push/PR triggers.
-# Use "npm run ci:local" on the developer's Mac instead.
+name: CI · Mac mini (Self-hosted)
+
+# This repository is public. Never execute untrusted fork PR code on the
+# persistent personal Mac mini. Only pushes within THIS repository trigger
+# its registered self-hosted runner; fork pushes stay inside their own fork.
+# Maintainers may also start a run manually with workflow_dispatch.
 on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
+      - 'docs/**'
+      - 'test/**'
+      - 'hotfix/**'
   workflow_dispatch:
+
+# No repository-writing token or secrets are needed for validation.
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-mini-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    name: Tests + TypeScript + Vite (Mac mini)
+    # Default registration labels on a macOS self-hosted runner.
+    # We intentionally don't assume ARM64 or a custom runner name.
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out trusted repository ref
+        uses: actions/checkout@v4
         with:
-          node-version: '22'
-      - run: npm install --no-package-lock --no-audit --no-fund
-      - run: npm test
-      - run: npm run build
+          persist-credentials: false
+
+      - name: Set up project Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Identify runner and revision
+        run: |
+          echo "Runner: $RUNNER_NAME ($RUNNER_OS / $RUNNER_ARCH)"
+          echo "Git ref: $GITHUB_REF"
+          git rev-parse HEAD
+          node --version
+          npm --version
+          uname -m
+
+      - name: Run full local CI (install + tests + build)
+        run: npm run ci:local
+
+      - name: Save CI report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: thethreerealms-ci-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local-ci/last-run.log
+          if-no-files-found: ignore
+          retention-days: 7
