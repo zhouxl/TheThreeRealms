@@ -27,15 +27,18 @@ export function segmentEntry(
   return near>=0&&near<=1?near:null;
 }
 
+/** Camera blocker proxy is built once, not reallocated each frame. */
+export const CAMERA_BLOCKERS:readonly BoxCollider[]=STATIC_COLLIDERS.filter(c=>c.camera).map(
+  (c):BoxCollider=>c.shape==='box'?c:{
+    id:c.id,shape:'box',center:c.center,
+    half:[c.radius,c.halfHeight,c.radius],camera:true,
+  },
+);
+
 /** Camera stays in front of temple walls / pillars / furniture while orbiting. */
 export function resolveCameraOcclusion(
   focus:Position3,desired:Position3,
-  blockers:readonly BoxCollider[]=STATIC_COLLIDERS.filter(c=>c.camera).map(
-    (c):BoxCollider=>c.shape==='box'?c:{
-      id:c.id,shape:'box',center:c.center,
-      half:[c.radius,c.halfHeight,c.radius],camera:true,
-    },
-  ),
+  blockers:readonly BoxCollider[]=CAMERA_BLOCKERS,
 ):Position3 {
   const ray={x:desired.x-focus.x,y:desired.y-focus.y,z:desired.z-focus.z};
   const distance=Math.hypot(ray.x,ray.y,ray.z);

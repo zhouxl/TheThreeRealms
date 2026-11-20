@@ -1,4 +1,3 @@
-import type RAPIER from '@dimforge/rapier3d-compat';
 import {
   CHARACTER_CENTER_Y,CHARACTER_HEIGHT,CHARACTER_RADIUS,STATIC_COLLIDERS,
   type ColliderSpec,
@@ -12,19 +11,22 @@ export type PhysicsDriver=Readonly<{
   position:()=>MovementResult;
   dispose:()=>void;
 }>;
-let rapierOnce:Promise<typeof RAPIER>|null=null;
+async function initializeRapier(){
+  const {default:lib}=await import('@dimforge/rapier3d-compat');
+  await lib.init();
+  return lib;
+}
+let rapierOnce:ReturnType<typeof initializeRapier>|null=null;
 
 /** WASM initialization is async and happens once; errors propagate to caller. */
-async function loadRapier():Promise<typeof RAPIER>{
-  if(!rapierOnce) {
-    rapierOnce=import('@dimforge/rapier3d-compat')
-      .then(async ({default:lib})=>{await lib.init();return lib;})
-      .catch(err=>{rapierOnce=null;throw err;});
-  }
+function loadRapier():ReturnType<typeof initializeRapier>{
+  if(!rapierOnce)rapierOnce=initializeRapier().catch(error=>{
+    rapierOnce=null;throw error;
+  });
   return rapierOnce;
 }
 
-function colliderDesc(rapier:typeof RAPIER,spec:ColliderSpec):RAPIER.ColliderDesc{
+function colliderDesc(rapier:Awaited<ReturnType<typeof loadRapier>>,spec:ColliderSpec){
   const desc=spec.shape==='box'
     ?rapier.ColliderDesc.cuboid(...spec.half)
     :rapier.ColliderDesc.cylinder(spec.halfHeight,spec.radius);
@@ -53,6 +55,8 @@ export async function createPhysicsDriver(
     const collider=world.createCollider(
       rapier.ColliderDesc.capsule(capsuleHalfHeight,CHARACTER_RADIUS),body,
     );
+    // Populate the query pipeline after registering all static colliders.
+    world.step();
     const controller=world.createCharacterController(0.015);
     controller.setUp({x:0,y:1,z:0});
     controller.enableAutostep(0.22,0.10,false);

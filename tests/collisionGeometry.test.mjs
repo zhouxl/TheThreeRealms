@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   STATIC_COLLIDERS, CHARACTER_HEIGHT,CHARACTER_RADIUS, isInsideStaticBox,
 } from '../src/game/collisionGeometry.ts';
-import {resolveCameraOcclusion,segmentEntry} from '../src/game/cameraOcclusion.ts';
+import {resolveCameraOcclusion,segmentEntry,CAMERA_BLOCKERS} from '../src/game/cameraOcclusion.ts';
 
 test('colliders reflect the actual courtyard, hall, steps and censer geometry',()=>{
   const ids=STATIC_COLLIDERS.map(x=>x.id);
@@ -44,4 +44,14 @@ test('camera raycasting does not clip to the ground or shrine when starting with
   const altar={id:'altar',shape:'box',center:[0,1.5,-6],half:[1,1,1],camera:true};
   const origin={x:0,y:1.5,z:-6};
   assert.deepEqual(resolveCameraOcclusion(origin,{x:0,y:2,z:-2},[altar]),{x:0,y:2,z:-2});
+});
+
+test('camera obstacles also include the cylindrical courtyard and temple pillars',()=>{
+  assert.ok(CAMERA_BLOCKERS.some(c=>c.id==='pillar--1.75-0'));
+  const pillar=CAMERA_BLOCKERS.find(c=>c.id==='pillar--1.75-0');
+  assert.equal(pillar.shape,'box');
+  const clipped=resolveCameraOcclusion(
+    {x:-1.75,y:2,z:2},{x:-1.75,y:2,z:-2},[pillar],
+  );
+  assert.ok(clipped.z>0.2,'camera must stop before the temple pillar');
 });

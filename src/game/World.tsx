@@ -391,6 +391,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
   const physicsDriver=useRef<PhysicsDriver|null>(null);
+  const physicsState=useRef<'pending'|'ready'|'fallback'>('pending');
   const approachStallSeconds=useRef(0);
   const approachWaypoints=useRef<PlayerPosition[]>([]);
   const approachStarted=useRef(false);
@@ -417,9 +418,12 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       if(!mounted){driver.dispose();return;}
       physics=driver;
       physicsDriver.current=driver;
+      physicsState.current='ready';
     }).catch(error=>{
       // A failure to initialize WASM must never leave the old playable
       // prototype unresponsive. The legacy conservative blocker is fallback.
+      if(!mounted)return;
+      physicsState.current='fallback';
       console.error('[TheThreeRealms] Rapier init failed; using legacy movement.',error);
     });
     return ()=>{
@@ -509,8 +513,12 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     const pos=position.current;
     const stepDt=Math.min(dt,0.045);
     const navigate=(from:PlayerPosition,dx:number,dz:number):PlayerPosition=>{
-      if(!physicsDriver.current)return moveWithCollision(from,dx,dz);
-      const result=physicsDriver.current.move(dx,dz,stepDt);
+      // Do not move while WASM loads. Otherwise the old controller could
+      // move first and Rapier would later snap the actor to its stale start.
+      if(physicsState.current==='pending')return from;
+      const driver=physicsDriver.current;
+      if(!driver)return moveWithCollision(from,dx,dz);
+      const result=driver.move(dx,dz,stepDt);
       return {x:result.x,z:result.z};
     };
     if (ritual.kind==='incense' && ritual.step==='approach' && ready){
@@ -566,8 +574,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       }
     }else{isWalking.current=false;}
     const current=position.current;
+    const footY=physicsDriver.current?.position().y ?? floorHeight(current.z);
     if(player.current){
-      const footY=physicsDriver.current?.position().y ?? floorHeight(current.z);
       player.current.position.set(current.x,footY+(isWalking.current?Math.abs(Math.sin(state.clock.elapsedTime*10))*0.025:0),current.z);
     }
     const nearby=getNearestStation(current);
@@ -575,8 +583,8 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     let goal:THREE.Vector3,look:THREE.Vector3;
     if(ritual.kind==='explore' || (ritual.kind==='incense' && ritual.step==='approach')){
       const distance=4.6,theta=yaw.current;
-      goal=new THREE.Vector3(current.x+Math.sin(theta)*distance, floorHeight(current.z)+2.65,current.z+Math.cos(theta)*distance);
-      look=new THREE.Vector3(current.x,floorHeight(current.z)+1.23,current.z-0.55);
+      goal=new THREE.Vector3(current.x+Math.sin(theta)*distance,footY+2.65,current.z+Math.cos(theta)*distance);
+      look=new THREE.Vector3(current.x,footY+1.23,current.z-0.55);
     }else{
       const p=STATIONS[ritual.kind].position;
       const focus=ritual.kind==='incense'

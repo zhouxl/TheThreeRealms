@@ -18,8 +18,8 @@ test('Rapier capsule slides along corner instead of tunneling through wall',asyn
   try{
     let moved=p.position();
     for(let i=0;i<100;i++)moved=p.move(.025,-.025,1/60);
-    assert.ok(moved.x<4.0,'front wall and outer shell reject penetration');
-    assert.ok(moved.z>-.4,'front wall prevents walking straight through its side');
+    assert.ok(moved.x>3.0,'character should slide sideways along the front wall');
+    assert.ok(moved.z>0.15,'front wall prevents walking straight through its side');
   }finally{p.dispose();}
 });
 
