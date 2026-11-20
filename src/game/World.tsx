@@ -23,6 +23,7 @@ import {
 import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
 import {createPhysicsDriver,type PhysicsDriver} from './physicsDriver.ts';
 import {resolveCameraOcclusion} from './cameraOcclusion.ts';
+import {STATIC_COLLIDERS} from './collisionGeometry.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
 import GLBTraveler from './GLBTraveler.tsx';
@@ -368,6 +369,23 @@ function Traveler({
   </group>;
 }
 
+/** Optional world-space physics wireframes for on-device visual QA.
+ * Enable with ?physicsDebug=1; does not change gameplay colliders.
+ */
+function PhysicsDebugView(){
+  return <group>
+    {STATIC_COLLIDERS.map(spec=><mesh key={spec.id} position={spec.center}>
+      {spec.shape==='box'
+        ?<boxGeometry args={[spec.half[0]*2,spec.half[1]*2,spec.half[2]*2]}/>
+        :<cylinderGeometry args={[spec.radius,spec.radius,spec.halfHeight*2,16]}/>}
+      <meshBasicMaterial color={spec.id.startsWith('step-')?'#5dc1ed':'#f2b357'}
+        wireframe depthTest={false} transparent opacity={0.45}/>
+    </mesh>)}
+  </group>;
+}
+const PHYSICS_DEBUG=typeof window!=='undefined'
+  &&new URLSearchParams(window.location.search).get('physicsDebug')==='1';
+
 export type Direction = 'up'|'down'|'left'|'right';
 export type InputRef = MutableRefObject<Record<Direction, boolean>>;
 export type WorldProps = {
@@ -629,6 +647,7 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
     <ambientLight intensity={0.38}/>
     <Surroundings/>
     <Hall/>
+    {PHYSICS_DEBUG&&<PhysicsDebugView/>}
     {deityGlbPath ? <AssetBoundary label="Wenchang deity" fallback={<Deity/>}>
       <Suspense fallback={<Deity/>}>
         <GLBDeity url={deityGlbPath}/>

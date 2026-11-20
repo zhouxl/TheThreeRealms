@@ -23,6 +23,14 @@ npm run preview
 
 **重要：** Github Actions 分钟用尽，自动 `push` / `pull_request` 验证已关闭。以后以本地 `npm run ci:local` 的退出结果和 `.local-ci/last-run.log` 作为 PR 验收证据；详细步骤见 [本地 CI 说明](docs/LOCAL_CI.md)。
 
+## V1.6 物理角色控制（Draft PR）
+
+V1.6 在独立的 Draft PR 中引入 `@dimforge/rapier3d-compat` 的 WASM 运动学胶囊控制器，并为庭院、香炉、台阶、殿门、墙体、供案、求签台和福牌架设置统一碰撞代理体。自动前往香炉与手动移动复用同一个物理控制器；镜头通过遮挡线段检测在建筑前收缩，减轻穿墙镜头。
+
+**调试碰撞形状：** 运行 `npm run dev` 后打开 `http://localhost:5173/?physicsDebug=1`，会显示黄色物理代理体和蓝色台阶代理体。调试线框不参与游戏判定，也不会被写入存档。
+
+**重要：** 本阶段基于当前 `main`（V1.4）独立开发；文昌神像 V1.5 / PR #5 仍然单独待验收。GitHub Actions 自动触发关闭，请在 Mac 上执行 `npm run ci:local`，测试全部 PASS 且浏览器里确认移动与镜头无异常后才合并。
+
 ## V1.4：首次内置可动画 GLB 技术角色
 
 仓库现已包含真实二进制 GLB：`public/models/traveler-tech-demo.glb`（**低多边形技术验证资产，不是最终美术**）。不需要下载额外模型，运行 `npm run dev` 即默认加载并显示该小旅人。它是 glTF 2.0 带蒙皮的模型，包含 13 个关节（新增右肘和右腕）、`IncenseGrip` 手持香挂点，以及 `Idle`、`Walk`、`HoldIncense`、`Bow`、`PlaceIncense` 动画。
