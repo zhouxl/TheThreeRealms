@@ -7,12 +7,18 @@ export type Position3=Readonly<{x:number;y:number;z:number}>;
 export function segmentEntry(
   origin:Position3, target:Position3,box:BoxCollider,
 ):number|null {
+  // Only ignore when the focus is inside the FULL 3D blocker; being
+  // horizontally aligned with a wall is not sufficient.
+  if(
+    Math.abs(origin.x-box.center[0])<box.half[0]&&
+    Math.abs(origin.y-box.center[1])<box.half[1]&&
+    Math.abs(origin.z-box.center[2])<box.half[2]
+  )return null;
   const diff={x:target.x-origin.x,y:target.y-origin.y,z:target.z-origin.z};
   let near=0,far=1;
   for(const [axis,i] of [['x',0],['y',1],['z',2]] as const){
     const min=box.center[i]-box.half[i],max=box.center[i]+box.half[i];
     const start=origin[axis],velocity=diff[axis];
-    if(start>min && start<max)return null; // handled below, origin-inside independently
     if(Math.abs(velocity)<1e-9){if(start<min||start>max)return null;continue;}
     const t1=(min-start)/velocity,t2=(max-start)/velocity;
     near=Math.max(near,Math.min(t1,t2));far=Math.min(far,Math.max(t1,t2));
