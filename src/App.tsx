@@ -85,6 +85,14 @@ export default function App(){
     return ()=>{window.removeEventListener('keydown',handleDown);window.removeEventListener('keyup',handleUp);window.removeEventListener('blur',blur);};
   },[entered,interact,input]);
 
+  const onIncenseApproachFailed=useCallback(()=>{
+    const active=ritualRef.current;
+    if(active.kind!=='incense'||active.step!=='approach')return;
+    const next:Ritual={kind:'explore'};
+    ritualRef.current=next;setRitual(next);
+    setError('前往香炉的路线被阻挡，请移动到开阔位置后再试。');
+  },[]);
+
   const onIncenseApproachComplete=useCallback(()=>{
     if(ritualRef.current.kind!=='incense'||ritualRef.current.step!=='approach')return;
     const next:Ritual={kind:'incense',step:'take'};
@@ -197,7 +205,7 @@ export default function App(){
         </div>
       </header>
       <div className="scene-wrap">
-        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} onIncenseApproachComplete={onIncenseApproachComplete} onIncenseActionComplete={onIncenseActionComplete} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
+        <World input={input} ritual={ritual} blessings={memories.blessings} incenseCount={memories.incense.length} onIncenseApproachComplete={onIncenseApproachComplete} onIncenseApproachFailed={onIncenseApproachFailed} onIncenseActionComplete={onIncenseActionComplete} ready={entered && !memoryOpen && !settingsOpen} onNearby={setNearest} onInteract={interact}/>
         <div className="scene-caption"><span className="caption-dash"/>山有清风 · 殿有书香</div>
         {entered && ritual.kind==='explore' && nearest && <button className="interact-hint" onClick={()=>interact(nearest)}><kbd>E</kbd>{STATIONS[nearest].label}<span>↗</span></button>}
         {entered && ritual.kind==='explore' && <div className="move-guide">W A S D 移动 · 拖动场景调整视角 · E 互动</div>}

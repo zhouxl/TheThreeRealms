@@ -61,15 +61,17 @@ export function planIncenseApproach(
 }
 
 export type ApproachTick=Readonly<{position:PlayerPosition;reached:boolean;moving:boolean}>;
+export type NavigationMove=(from:PlayerPosition,dx:number,dz:number)=>PlayerPosition;
 
 export function tickApproach(
   from:PlayerPosition,to:PlayerPosition,deltaSeconds:number,
   speed=INCENSE_APPROACH_SPEED,
+  navigate:NavigationMove=moveWithCollision,
 ):ApproachTick {
   const dx=to.x-from.x,dz=to.z-from.z,distance=Math.hypot(dx,dz);
   if(distance<=INCENSE_APPROACH_TOLERANCE)return {position:to,reached:true,moving:false};
   const step=Math.min(distance,Math.max(0,deltaSeconds)*speed);
-  const next=moveWithCollision(from,dx/distance*step,dz/distance*step);
+  const next=navigate(from,dx/distance*step,dz/distance*step);
   const remaining=Math.hypot(to.x-next.x,to.z-next.z);
   return {position:next,reached:remaining<=INCENSE_APPROACH_TOLERANCE,moving:Math.hypot(next.x-from.x,next.z-from.z)>0.00001};
 }
