@@ -374,7 +374,8 @@ function Traveler({
  */
 function PhysicsDebugView(){
   return <group>
-    {STATIC_COLLIDERS.map(spec=><mesh key={spec.id} position={spec.center}>
+    {STATIC_COLLIDERS.map(spec=><mesh key={spec.id}
+      position={[spec.center[0],spec.center[1],spec.center[2]]}>
       {spec.shape==='box'
         ?<boxGeometry args={[spec.half[0]*2,spec.half[1]*2,spec.half[2]*2]}/>
         :<cylinderGeometry args={[spec.radius,spec.radius,spec.halfHeight*2,16]}/>}
