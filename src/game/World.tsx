@@ -21,6 +21,8 @@ import {
   planIncenseApproach, tickApproach,
 } from './incenseApproach.ts';
 import {normalizePublicGlbPath, resolveTravelerAssetUrl} from './assets.ts';
+import {createPhysicsDriver,type PhysicsDriver} from './physicsDriver.ts';
+import {resolveCameraOcclusion} from './cameraOcclusion.ts';
 import AssetBoundary from './AssetBoundary.tsx';
 import GLBDeity from './GLBDeity.tsx';
 import GLBTraveler from './GLBTraveler.tsx';
@@ -375,22 +377,27 @@ export type WorldProps = {
   incenseCount: number;
   onIncenseActionComplete: (action:IncenseAction)=>void;
   onIncenseApproachComplete: ()=>void;
+  onIncenseApproachFailed: ()=>void;
   onNearby: (station:Station|null)=>void;
   onInteract: (station:Station)=>void;
   ready: boolean;
 };
 
-function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onIncenseApproachComplete,onNearby,onInteract,ready}:WorldProps){
+function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,onIncenseApproachComplete,onIncenseApproachFailed,onNearby,onInteract,ready}:WorldProps){
   const player=useRef<THREE.Group>(null);
   const position=useRef<PlayerPosition>({x:0,z:6.1});
   const yaw=useRef(0);
   const ritualOrbit=useRef(DEFAULT_RITUAL_ORBIT);
   const lastNearby=useRef<Station|null>(null);
   const isWalking=useRef(false);
+  const physicsDriver=useRef<PhysicsDriver|null>(null);
+  const approachStallSeconds=useRef(0);
   const approachWaypoints=useRef<PlayerPosition[]>([]);
   const approachStarted=useRef(false);
   const approachCompleteRef=useRef(onIncenseApproachComplete);
   approachCompleteRef.current=onIncenseApproachComplete;
+  const approachFailureRef=useRef(onIncenseApproachFailed);
+  approachFailureRef.current=onIncenseApproachFailed;
   const actionProgress=useRef(0);
   const actionElapsed=useRef(0);
   const actionStep=useRef<IncenseAction|null>(null);
@@ -404,9 +411,29 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
   onNearbyRef.current=onNearby;
 
   useEffect(()=>{
+    let mounted=true;
+    let physics:PhysicsDriver|null=null;
+    void createPhysicsDriver(position.current).then(driver=>{
+      if(!mounted){driver.dispose();return;}
+      physics=driver;
+      physicsDriver.current=driver;
+    }).catch(error=>{
+      // A failure to initialize WASM must never leave the old playable
+      // prototype unresponsive. The legacy conservative blocker is fallback.
+      console.error('[TheThreeRealms] Rapier init failed; using legacy movement.',error);
+    });
+    return ()=>{
+      mounted=false;
+      if(physicsDriver.current===physics)physicsDriver.current=null;
+      physics?.dispose();
+    };
+  },[]);
+
+  useEffect(()=>{
     if(ritual.kind==='incense' && ritual.step==='approach'){
       approachWaypoints.current=planIncenseApproach(position.current);
       approachStarted.current=true;
+      approachStallSeconds.current=0;
     }else{
       approachWaypoints.current=[];
       approachStarted.current=false;
@@ -480,13 +507,27 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       }
     }
     const pos=position.current;
+    const stepDt=Math.min(dt,0.045);
+    const navigate=(from:PlayerPosition,dx:number,dz:number):PlayerPosition=>{
+      if(!physicsDriver.current)return moveWithCollision(from,dx,dz);
+      const result=physicsDriver.current.move(dx,dz,stepDt);
+      return {x:result.x,z:result.z};
+    };
     if (ritual.kind==='incense' && ritual.step==='approach' && ready){
       if(approachStarted.current){
         const point=approachWaypoints.current[0];
         if(point){
-          const tick=tickApproach(pos,point,Math.min(dt,0.045));
+          const tick=tickApproach(pos,point,stepDt,WORLD.speed,navigate);
           position.current=tick.position;
           isWalking.current=tick.moving;
+          approachStallSeconds.current=tick.moving?0:approachStallSeconds.current+stepDt;
+          if(approachStallSeconds.current>2){
+            // Never teleport around a blocker; fail the approach and let the
+            // player choose a different starting position.
+            console.warn('[TheThreeRealms] Incense approach physically blocked; cancelling walk.');
+            approachStarted.current=false;
+            approachFailureRef.current();
+          }
           if(tick.moving && player.current){
             const dx=tick.position.x-pos.x,dz=tick.position.z-pos.z;
             player.current.rotation.y=THREE.MathUtils.damp(
@@ -509,18 +550,25 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       const f=(keys.up?1:0)-(keys.down?1:0);
       const side=(keys.right?1:0)-(keys.left?1:0);
       const len=Math.hypot(f,side);
-      isWalking.current=len>0;
+      isWalking.current=false;
       if(len){
         const theta=yaw.current;
         const dx=((Math.cos(theta)*side-Math.sin(theta)*f)/len)*WORLD.speed*Math.min(dt,0.045);
         const dz=((-Math.sin(theta)*side-Math.cos(theta)*f)/len)*WORLD.speed*Math.min(dt,0.045);
-        position.current=moveWithCollision(pos,dx,dz);
-        if(player.current && (dx || dz)) player.current.rotation.y=THREE.MathUtils.damp(player.current.rotation.y,Math.atan2(dx,-dz),10,dt);
+        const actual=navigate(pos,dx,dz);
+        position.current=actual;
+        isWalking.current=Math.hypot(actual.x-pos.x,actual.z-pos.z)>0.000001;
+        if(player.current && Math.hypot(actual.x-pos.x,actual.z-pos.z)>0.000001){
+          player.current.rotation.y=THREE.MathUtils.damp(
+            player.current.rotation.y,Math.atan2(actual.x-pos.x,-(actual.z-pos.z)),10,dt,
+          );
+        }
       }
     }else{isWalking.current=false;}
     const current=position.current;
     if(player.current){
-      player.current.position.set(current.x,floorHeight(current.z)+(isWalking.current?Math.abs(Math.sin(state.clock.elapsedTime*10))*0.025:0),current.z);
+      const footY=physicsDriver.current?.position().y ?? floorHeight(current.z);
+      player.current.position.set(current.x,footY+(isWalking.current?Math.abs(Math.sin(state.clock.elapsedTime*10))*0.025:0),current.z);
     }
     const nearby=getNearestStation(current);
     if(nearby!==lastNearby.current){lastNearby.current=nearby;onNearbyRef.current(nearby);}
@@ -538,7 +586,20 @@ function GameWorld({input,ritual,blessings,incenseCount,onIncenseActionComplete,
       goal=new THREE.Vector3(orbitGoal.x,orbitGoal.y,orbitGoal.z);
       look=new THREE.Vector3(focus.x,focus.y,focus.z);
     }
-    camera.position.lerp(goal,1-Math.exp(-4.5*dt));
+    const unobstructed=resolveCameraOcclusion(
+      {x:look.x,y:look.y,z:look.z},{x:goal.x,y:goal.y,z:goal.z},
+    );
+    camera.position.lerp(
+      new THREE.Vector3(unobstructed.x,unobstructed.y,unobstructed.z),
+      1-Math.exp(-4.5*dt),
+    );
+    // A smoothed camera must also be clipped, otherwise it can pass through
+    // a wall for a few frames while interpolating between two valid views.
+    const clipped=resolveCameraOcclusion(
+      {x:look.x,y:look.y,z:look.z},
+      {x:camera.position.x,y:camera.position.y,z:camera.position.z},
+    );
+    camera.position.set(clipped.x,clipped.y,clipped.z);
     const target=new THREE.Vector3();
     camera.getWorldDirection(target);
     const currentLook=camera.position.clone().add(target.multiplyScalar(4));

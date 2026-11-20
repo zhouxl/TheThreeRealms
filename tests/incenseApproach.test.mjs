@@ -50,3 +50,18 @@ test('cancelled approach is harmless and never moves player after cancellation',
   const next=tickApproach(start,INCENSE_APPROACH_POINT,0);
   assert.deepEqual(next.position,start);
 });
+
+test('automatic incense approach shares injected collision solver with manual movement',()=>{
+  const start={x:0,z:6.1};
+  let calls=0;
+  const blocked=(from,dx,dz)=>{
+    calls++;
+    assert.ok(dz<0 && dx===0);
+    return from;
+  };
+  const tick=tickApproach(start,INCENSE_APPROACH_POINT,1/60,1.7,blocked);
+  assert.equal(calls,1);
+  assert.equal(tick.reached,false);
+  assert.equal(tick.moving,false);
+  assert.deepEqual(tick.position,start);
+});

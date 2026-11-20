@@ -30,8 +30,11 @@ export function segmentEntry(
 /** Camera stays in front of temple walls / pillars / furniture while orbiting. */
 export function resolveCameraOcclusion(
   focus:Position3,desired:Position3,
-  blockers:readonly BoxCollider[]=STATIC_COLLIDERS.filter(
-    (c):c is BoxCollider=>c.camera&&c.shape==='box',
+  blockers:readonly BoxCollider[]=STATIC_COLLIDERS.filter(c=>c.camera).map(
+    (c):BoxCollider=>c.shape==='box'?c:{
+      id:c.id,shape:'box',center:c.center,
+      half:[c.radius,c.halfHeight,c.radius],camera:true,
+    },
   ),
 ):Position3 {
   const ray={x:desired.x-focus.x,y:desired.y-focus.y,z:desired.z-focus.z};
